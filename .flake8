@@ -1,0 +1,5 @@
+[flake8]
+max-line-length = 88
+extend-ignore = E203
+max-complexity = 100
+exclude = src/chemcensor/rules/functional_groups.py

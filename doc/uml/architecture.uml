@@ -1,0 +1,361 @@
+classDiagram
+
+    %% ============================================================
+    %% Top-level orchestration
+    %% ============================================================
+
+    ChemCensor --> DBManager
+    ChemCensor --> ReactionProcessor
+    ChemCensor --> ReactionCenterExtractor
+    ChemCensor --> ScoringConfig
+
+    ReactionCenterDBComposer --> DBManager
+    ReactionCenterDBComposer --> Processor
+    ReactionCenterDBComposer --> ReactionCenterExtractor
+
+    %% ============================================================
+    %% Database
+    %% ============================================================
+
+    DBManager --> Reaction
+    DBManager --> ReactionCenter
+
+    %% ============================================================
+    %% Processing pipeline
+    %% ============================================================
+
+    ReactionProcessor ..|> Processor
+    Mapper ..|> Processor
+    Validator ..|> Processor
+    OrphanRemover ..|> Processor
+    TransformCreator ..|> Processor
+    CanoRxnAnnotator ..|> Processor
+    SeArAnnotator ..|> Processor
+    SisAnnotator ..|> Processor
+    StaticStereoValidator ..|> Processor
+    BatchFilter ..|> Processor
+
+    Processor --> Reaction
+    TransformCreator --> ReactionTransform
+    SeArAnnotator --> FunctionalGroups
+    SisAnnotator --> MoleculeStereoSpecification
+    StaticStereoValidator --> MoleculeStereoSpecification
+    StaticStereoValidator --> ReactionTransform
+
+    %% ============================================================
+    %% Extraction pipeline
+    %% ============================================================
+
+    ReactionCenterExtractor --> Extractor
+    ReactionCenterExtractor --> FGFinder
+    ReactionCenterExtractor --> Reaction
+
+    Extractor --> MolecularFragmentExtractor
+    Extractor --> ExtractionConfig
+    Extractor --> ReactionTransform
+    Extractor --> ReactionCenter
+    Extractor --> ReactionCenterFragment
+    Extractor --> ReactionCenterType
+    ExtractionConfig --> ReactionCenterType
+
+    MolecularFragmentExtractor --> Molecule
+    MolecularFragmentExtractor --> ExtractionConfig
+
+    FGFinder --> FunctionalGroups
+    FGFinder --> Reaction
+    FGFinder --> ReactionCenter
+
+    %% ============================================================
+    %% Core domain model
+    %% ============================================================
+
+    Reaction --> ReactionTransform
+    Reaction --> ReactionCenter
+    ReactionTransform --> Molecule
+    ReactionCenter --> ReactionCenterFragment
+    ReactionCenter --> ReactionCenterType
+    FunctionalGroups --> FunctionalGroup
+    FunctionalGroups --> MatchedGroup
+    MatchedGroup --> FunctionalGroup
+    FunctionalGroup --> FunctionalGroupClass
+
+    %% ============================================================
+    %% Class definitions
+    %% ============================================================
+
+    class ChemCensor {
+        -DBManager manager
+        -ReactionProcessor processor
+        -ReactionCenterExtractor rc_extractor
+        -bool find_exact_match
+        +score(str reaction_smiles) float
+    }
+
+    class DBManager {
+        +load(PathLike db_path) DBManager
+        +dump(PathLike db_path)
+        +find_center(str reaction_center_smiles) np.ndarray
+        +update(str reaction_center_smiles, np.ndarray fg_signature)
+        +add_reaction_center(str reaction_center_smiles, np.ndarray fg_signature)
+        +add_center_to_reaction(str reaction_center_smiles, str reaction_smiles, np.ndarray fg_signature)
+        +find_center_to_reaction(str reaction_center_smiles, str reaction_smiles) bool
+        +find_reaction(str reaction_smiles) list[str]
+        +add_reaction(str reaction_smiles, str document_id)
+    }
+
+    class ReactionCenterDBComposer {
+        -DBManager manager
+        -Processor processor
+        -ReactionCenterExtractor extractor
+        -int batch_size
+        -str reaction_smiles_column
+        -str document_id_column
+        -_read(PathLike reference_data_path) Iterable[Reaction]
+        -_add_reactions(Sequence[Reaction] reactions)
+        -_add_centers(Sequence[Reaction] reactions)
+        -_compose_batch(Sequence[Reaction] batch)
+        -_run_postprocessing()
+        +compose(PathLike reference_data_path, PathLike output_data_path)
+    }
+
+    class ScoringConfig {
+        <<Enum>>
+    }
+
+    %% ---- Processing ----
+
+    class Processor {
+        <<Protocol>>
+        +process(Reaction reaction) Reaction
+        +process_batch(Sequence[Reaction] reactions) Sequence[Reaction]
+    }
+
+    class ReactionProcessor {
+        +Sequence[Processor] processors
+        +process(Reaction reaction) Reaction
+        +process_batch(Sequence[Reaction] reactions) Sequence[Reaction]
+    }
+
+    class Mapper {
+        +process(Reaction reaction) Reaction
+        +process_batch(Sequence[Reaction] reactions) Sequence[Reaction]
+    }
+
+    class Validator {
+        +Sequence[Callable[[str], None]] validators
+        +process(Reaction reaction) Reaction
+        +process_batch(Sequence[Reaction] reactions) Sequence[Reaction]
+    }
+
+    class OrphanRemover {
+        +process(Reaction reaction) Reaction
+        +process_batch(Sequence[Reaction] reactions) Sequence[Reaction]
+    }
+
+    class TransformCreator {
+        +process(Reaction reaction) Reaction
+        +process_batch(Sequence[Reaction] reactions) Sequence[Reaction]
+    }
+
+    class CanoRxnAnnotator {
+        +process(Reaction reaction) Reaction
+        +process_batch(Sequence[Reaction] reactions) Sequence[Reaction]
+    }
+
+    class SeArAnnotator {
+        +FunctionalGroups functional_groups
+        +process(Reaction reaction) Reaction
+        +process_batch(Sequence[Reaction] reactions) Sequence[Reaction]
+    }
+
+    class SisAnnotator {
+        +process(Reaction reaction) Reaction
+        +process_batch(Sequence[Reaction] reactions) Sequence[Reaction]
+        +is_sis_reaction(ReactionTransform transform, MoleculeStereoSpecification stereo_spec_product, list[MoleculeStereoSpecification] stereo_specs_reactants) bool
+        +confirm_center_consistency_in_static_part(ReactionTransform transform, MoleculeStereoSpecification stereo_spec_product, list[MoleculeStereoSpecification] stereo_specs_reactants) bool
+        -_extract_stereo_spec(Molecule molecule) MoleculeStereoSpecification
+        -_has_sis_atom_stereo(ReactionTransform transform, MoleculeStereoSpecification stereo_spec_product, list[MoleculeStereoSpecification] stereo_specs_reactants) bool
+        -_has_sis_alkene_stereo(ReactionTransform transform, MoleculeStereoSpecification stereo_spec_product, list[MoleculeStereoSpecification] stereo_specs_reactants) bool
+        -_confirm_bond_stereo_consistency_in_static_part(ReactionTransform transform, MoleculeStereoSpecification stereo_spec_product, list[MoleculeStereoSpecification] stereo_specs_reactants, set[int] reacting_atoms) bool
+    }
+
+    class StaticStereoValidator {
+        +process(Reaction reaction) Reaction
+        +process_batch(Sequence[Reaction] reactions) Sequence[Reaction]
+    }
+
+    class BatchFilter {
+        +process(Reaction reaction) Reaction
+        +process_batch(Sequence[Reaction] reactions) Sequence[Reaction]
+    }
+
+    %% ---- Domain model ----
+
+    class Reaction {
+        <<Dataclass / frozen>>
+        +str reaction_smiles
+        +str mapped_reaction_smiles
+        +str processed_reaction_smiles
+        +ReactionTransform reaction_transform
+        +bool is_sear_reaction
+        +np.ndarray sear_signature
+        +frozendict[ReactionCenterType, ReactionCenter] reaction_centers
+        +str canonical_smiles
+        +bool is_sis_reaction
+        +bool is_tautomerization_reaction
+        +bool dummy
+        +str document_id
+        +get_reaction_center_by_type(ReactionCenterType center_type) ReactionCenter
+    }
+
+    class ReactionTransform {
+        <<Dataclass / frozen>>
+        +tuple[Molecule, ...] reactants
+        +Molecule product
+        +frozendict[int, Optional[tuple[int, ...]]] pR_map
+        +tuple[frozendict[int, Optional[int]], ...] Rp_map
+        +Optional[tuple[int, ...]] p_reacting_atoms
+        +Optional[tuple[tuple[int, ...], ...]] R_reacting_atoms
+        +bool has_reacting_atoms
+        +from_reaction_smiles(str reaction_smiles) ReactionTransform
+    }
+
+    class Molecule {
+        +str canonical_smiles
+        +Chem.Mol canonical_rdmol
+        +int num_atoms
+        +frozendict[int, Optional[int]] atom_map
+        +str atom_mapped_canonical_smiles
+        +Chem.Mol atom_mapped_canonical_rdmol
+        +from_atom_mapped_rdmol(Chem.Mol rdmol) Molecule
+        +from_atom_mapped_smiles(str smiles) Molecule
+    }
+
+    class ReactionCenterType {
+        <<IntEnum>>
+    }
+
+    class ReactionCenter {
+        <<Dataclass / frozen>>
+        +ReactionCenterType center_type
+        +ReactionCenterFragment product_fragment
+        +tuple[ReactionCenterFragment, ...] reactant_fragments
+        +frozenset[int] product_indices
+        +tuple[frozenset[int], ...] reactant_indices
+        +np.ndarray fg_signature
+        +str reaction_center_smiles
+        +tuple[str, ...] reaction_center_components
+        +bool is_reaction_center_composite
+    }
+
+    class ReactionCenterFragment {
+        <<Dataclass / frozen>>
+        +Chem.Mol fr_mol
+        +str atom_mapped_smiles
+        +str smiles
+        +tuple[tuple[str, frozenset[int]], ...] mapped_components
+    }
+
+    class MoleculeStereoSpecification {
+        <<Dataclass / frozen>>
+        +tuple[int, ...] assigned_atom_centers
+        +tuple[int, ...] unassigned_atom_centers
+        +tuple[int, ...] assigned_bridgehead_atom_centers
+        +tuple[int, ...] unassigned_bridgehead_atom_centers
+        +tuple[tuple[int, int], ...] assigned_bond_centers
+        +tuple[tuple[int, int], ...] unassigned_bond_centers
+        +frozendict[int, str] atom_center_labels
+        +extract_from_molecule(Chem.Mol mol) MoleculeStereoSpecification
+    }
+
+    %% ---- Functional groups ----
+
+    class FunctionalGroupClass {
+        <<Enum>>
+    }
+
+    class FunctionalGroup {
+        <<Dataclass / frozen>>
+        +int idx
+        +str name
+        +str smarts
+        +FunctionalGroupClass fg_class
+        +Chem.Mol pattern
+        +from_dict(frozendict[str, Union[int, str, FunctionalGroupClass]] fg_group_data) FunctionalGroup
+    }
+
+    class FunctionalGroups {
+        <<Dataclass / frozen>>
+        +tuple[FunctionalGroup, ...] known_groups
+        +NDArray[np.uint8] fps_bits_collection
+        +int fp_length
+        +from_tuple(tuple[frozendict[str, Union[int, str, FunctionalGroupClass]], ...] functional_groups, int fp_length) FunctionalGroups
+        +identify_functional_groups(Molecule mol) tuple[MatchedGroup, ...]
+    }
+
+    class MatchedGroup {
+        <<Dataclass / frozen>>
+        +FunctionalGroup functional_group
+        +tuple[tuple[int, ...], ...] matching_sets
+    }
+
+    %% ---- Extraction ----
+
+    class ReactionCenterExtractor {
+        -ReactionCenterType max_center_type
+        -Extractor extractor
+        -FGFinder fg_finder_general
+        -FGFinder fg_finder_sear
+        -tuple[str, ...] tautomerization_rcs
+        -_is_tautomerization_reaction(Reaction reaction) bool
+        +extract_rc(Reaction reaction) Reaction
+        +extract_rc_for_batch(Sequence[Reaction] reactions) Sequence[Reaction]
+    }
+
+    class Extractor {
+        +ReactionCenterType max_center_type
+        +extract_rc(Reaction reaction) Reaction
+        -_extract_single_rc(ExtractionConfig config, ReactionTransform T, bool skip_symmetric_expansion) ReactionCenter
+        -_expand_symmetric_indices(Chem.Mol rdmol, Chem.Mol fragment, list[int] reactant_indices, list[int] product_indices, frozendict[int, Optional[int]] rp_map)
+        -_has_too_many_base_fragments(ReactionTransform T) bool
+        -_has_ring_atoms_in_rc(ReactionTransform T, ReactionCenter rc) bool
+        -_select_additional_configs(bool has_ring_atoms) tuple[ExtractionConfig, ...]
+    }
+
+    class MolecularFragmentExtractor {
+        +int neighbor_depth
+        +bool include_rings
+        +bool include_fused
+        +bool include_substituents
+        +bool include_chiral
+        -Molecule mol
+        -set[int] core_indices
+        -set[int] all_indices
+        +extract_fragment(Molecule mol, list[int] atom_indices) tuple[Chem.Mol, list[int]]
+        -_reset_state()
+        -_find_rings()
+        -_add_neighbors()
+        -_add_unmapped_atoms()
+        -_add_ring_atoms()
+        -_add_chiral_atoms()
+        -_add_functional_group_atoms()
+        -_create_fragment_molecule() tuple[Chem.Mol, list[int]]
+    }
+
+    class ExtractionConfig {
+        <<Dataclass / frozen>>
+        +ReactionCenterType center_type
+        +int neighbor_depth
+        +bool include_rings
+        +bool include_fused
+        +bool include_substituents
+        +bool include_chiral
+    }
+
+    class FGFinder {
+        +FunctionalGroups fg_collection
+        +find(Reaction reaction) Reaction
+        -_compute_signature(ReactionTransform transform, ReactionCenter rc) np.ndarray
+        -_compute_mol_signature(Molecule mol, frozenset[int] skip_indices, np.ndarray fg_signature) np.ndarray
+        +find_for_batch_and_annotate(Sequence[Reaction] reactions, Sequence[str] patents) Sequence[Reaction]
+    }

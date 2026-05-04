@@ -1,0 +1,5 @@
+frozendict==2.4.6
+numpy==1.26.4
+rdkit>=2025.3.5
+transformers==4.57.6
+rxnmapper==0.4.2

@@ -1,0 +1,40 @@
+[project]
+name = "chemcensor"
+version = "0.0.1"
+readme = "README.md"
+requires-python = ">=3.12"
+dynamic = ["dependencies", "optional-dependencies"]
+
+[tool.setuptools.dynamic]
+dependencies = { file = ["requirements/requirements.txt", ]}
+
+[tool.setuptools.dynamic.optional-dependencies]
+dev = { file = ["requirements/requirements-dev.txt"]}
+
+[tool.mypy]
+incremental = false
+ignore_missing_imports = true
+python_version = 3.12
+# Avoid mypy following into transformers (prevents INTERNAL ERROR in
+# transformers.models.sam_hq.processing_samhq when run in CI with full deps).
+[[tool.mypy.overrides]]
+module = "transformers.*"
+follow_imports = "skip"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = [
+  ".", "src",
+]
+markers = [
+    "smoke_test: Run smoke tests",
+    "heavy_test: Run heavy tests",
+]
+
+[tool.bandit]
+skips = ['B101', 'B105', 'B301', 'B311', 'B403', 'B404', 'B603', 'B607']
+exclude_dirs = ["tests"]
+
+[build-system]
+requires = ["setuptools>=43.0.0", "wheel"]
+build-backend = "setuptools.build_meta"

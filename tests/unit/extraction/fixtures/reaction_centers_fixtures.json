@@ -1,0 +1,308 @@
+[
+  {
+    "id": 1,
+    "mapped_reaction_smiles": "C[O:3][C:2](=[O:1])[c:4]1[cH:5][cH:6][cH:7][cH:8][c:9]1-[c:10]1[cH:11][cH:12][c:13]([CH2:14][N:15](C(C)=O)[C@@H:16]2[CH2:17][CH2:18][CH2:19][CH:20]2[N:21]([CH2:22][C:23]([F:24])([F:25])[F:26])C(C)=O)[nH:27]1>>[O:1]=[C:2]([OH:3])[c:4]1[cH:5][cH:6][cH:7][cH:8][c:9]1-[c:10]1[cH:11][cH:12][c:13]([CH2:14][NH:15][C@@H:16]2[CH2:17][CH2:18][CH2:19][CH:20]2[NH:21][CH2:22][C:23]([F:24])([F:25])[F:26])[nH:27]1",
+    "reaction_centers": {
+      "1": "CC(=O)N(C)C.CC(=O)N(C)C.COC=O>>CNC.CNC.OC=O",
+      "2": "CC(=O)N(C)C1CCC[C@H]1N(C)C(C)=O.COC=O>>CNC1CCC[C@H]1NC.OC=O"
+    },
+    "number_of_reaction_centers": 2
+  },
+  {
+    "id": 2,
+    "mapped_reaction_smiles": "[CH3:1][O:2][C:3](=[O:4])[c:5]1[cH:6][cH:7][cH:8][cH:9][c:10]1-[c:11]1[cH:12][cH:13][c:14]([CH2:15][NH:16][C@@H:20]2[CH2:21][CH2:22][CH2:23][CH:24]2[N:25]([CH2:26][C:27]([F:28])([F:29])[F:30])[C:31]([CH3:32])=[O:33])[nH:34]1.[CH3:18][C:17](=[O:19])OC(C)=O>>[CH3:1][O:2][C:3](=[O:4])[c:5]1[cH:6][cH:7][cH:8][cH:9][c:10]1-[c:11]1[cH:12][cH:13][c:14]([CH2:15][N:16]([C:17]([CH3:18])=[O:19])[C@@H:20]2[CH2:21][CH2:22][CH2:23][CH:24]2[N:25]([CH2:26][C:27]([F:28])([F:29])[F:30])[C:31]([CH3:32])=[O:33])[nH:34]1",
+    "reaction_centers": {
+      "1": "CC(=O)OC(C)=O.CNC>>CC(=O)N(C)C",
+      "2": "CC(=O)OC(C)=O.CNC1CCCC1>>CC(=O)N(C)C1CCCC1"
+    },
+    "number_of_reaction_centers": 2
+  },
+  {
+    "id": 3,
+    "mapped_reaction_smiles": "[CH3:29][C:28](=[O:30])[N:22]([CH2:23][C:24]([F:25])([F:26])[F:27])[CH:21]1[CH2:20][CH2:19][CH2:18][C@H:17]1[NH2:16].[CH3:1][O:2][C:3](=[O:4])[c:5]1[cH:6][cH:7][cH:8][cH:9][c:10]1-[c:11]1[cH:12][cH:13][c:14]([CH:15]=O)[nH:31]1>>[CH3:1][O:2][C:3](=[O:4])[c:5]1[cH:6][cH:7][cH:8][cH:9][c:10]1-[c:11]1[cH:12][cH:13][c:14]([CH2:15][NH:16][C@@H:17]2[CH2:18][CH2:19][CH2:20][CH:21]2[N:22]([CH2:23][C:24]([F:25])([F:26])[F:27])[C:28]([CH3:29])=[O:30])[nH:31]1",
+    "reaction_centers": {
+      "1": "CN.cC=O>>cCNC",
+      "2": "NC1CCCC1.O=Cc1cccn1>>C1CCC(NCc2cccn2)C1",
+      "4": "NC1CCCC1.c-c1ccc(C=O)n1>>c-c1ccc(CNC2CCCC2)n1"
+    },
+    "number_of_reaction_centers": 3
+  },
+  {
+    "id": 4,
+    "mapped_reaction_smiles": "[CH3:1][O:2][C:3](=[O:4])[c:5]1[cH:6][cH:7][cH:8][cH:9][c:10]1B(O)O.[O:16]=[CH:15][c:14]1[cH:13][cH:12][c:11](Br)[nH:17]1>>[CH3:1][O:2][C:3](=[O:4])[c:5]1[cH:6][cH:7][cH:8][cH:9][c:10]1-[c:11]1[cH:12][cH:13][c:14]([CH:15]=[O:16])[nH:17]1",
+    "reaction_centers": {
+      "1": "cc(c)B(O)O.cc(n)Br>>cc(c)-c(c)n",
+      "2": "Brc1cccn1.OB(O)c1ccccc1>>c1ccc(-c2cccn2)cc1",
+      "4": "O=Cc1ccc(Br)n1.OB(O)c1ccccc1C=O>>O=Cc1ccc(-c2ccccc2C=O)n1"
+    },
+    "number_of_reaction_centers": 3
+  },
+  {
+    "id": 5,
+    "mapped_reaction_smiles": "[CH3:1][C:2]([CH3:3])([CH3:4])[O:5][C:6](=[O:7])[NH:8][C@@H:9]1[CH2:10][CH2:11][CH2:12][CH:13]1[N:14]=[N+]=[N-]>>[CH3:1][C:2]([CH3:3])([CH3:4])[O:5][C:6](=[O:7])[NH:8][C@@H:9]1[CH2:10][CH2:11][CH2:12][CH:13]1[NH2:14]",
+    "reaction_centers": {
+      "1": "CN=N=N>>CN"
+    },
+    "number_of_reaction_centers": 1
+  },
+  {
+    "id": 6,
+    "mapped_reaction_smiles": "[CH3:1][C:2]([CH3:3])([CH3:4])[O:5][C:6](=[O:7])[NH:8][C@@H:9]1[CH2:10][CH2:11][CH2:12][CH:13]1OS(C)(=O)=O.[N-:14]=[N+:15]=[N-:16]>>[CH3:1][C:2]([CH3:3])([CH3:4])[O:5][C:6](=[O:7])[NH:8][C@@H:9]1[CH2:10][CH2:11][CH2:12][CH:13]1[N:14]=[N+:15]=[N-:16]",
+    "reaction_centers": {
+      "1": "CC(C)OS(C)(=O)=O.N=N=N>>CC(C)N=N=N",
+      "2": "CS(=O)(=O)OC1CCC[C@H]1N.N=N=N>>N[C@@H]1CCCC1N=N=N"
+    },
+    "number_of_reaction_centers": 2
+  },
+  {
+    "id": 7,
+    "mapped_reaction_smiles": "[CH3:1][c:2]1[cH:3][cH:4][cH:6][c:7]([CH:8]2[CH2:9][CH2:10]2)[c:11]1[NH2:12].[Br:5]Br>>[CH3:1][c:2]1[cH:3][c:4]([Br:5])[cH:6][c:7]([CH:8]2[CH2:9][CH2:10]2)[c:11]1[NH2:12]",
+    "reaction_centers": {
+      "1": "BrBr.ccc>>cc(c)Br",
+      "2": "BrBr.c1ccccc1>>Brc1ccccc1",
+      "4": "BrBr.Cc1cccc(C)c1N>>Cc1cc(Br)cc(C)c1N"
+    },
+    "number_of_reaction_centers": 3
+  },
+  {
+    "id": 8,
+    "mapped_reaction_smiles": "OB(O)[CH:7]1[CH2:8][CH2:9]1.[CH3:1][c:2]1[cH:3][cH:4][cH:5][c:6](Br)[c:10]1[NH2:11]>>[CH3:1][c:2]1[cH:3][cH:4][cH:5][c:6]([CH:7]2[CH2:8][CH2:9]2)[c:10]1[NH2:11]",
+    "reaction_centers": {
+      "1": "CC(C)B(O)O.cc(c)Br>>CC(C)c(c)c",
+      "2": "Brc1ccccc1.OB(O)C1CC1>>C1CC1c1ccccc1",
+      "4": "Cc1cccc(Br)c1N.OB(O)C1CC1>>Cc1cccc(C2CC2)c1N"
+    },
+    "number_of_reaction_centers": 3
+  },
+  {
+    "id": 9,
+    "mapped_reaction_smiles": "[CH3:1][O:2][C:3](=[O:4])[CH:5]([CH3:6])[CH2:7][c:8]1[cH:9][nH:10][c:12]2[n:13][cH:14][cH:15][n:16][c:17]12.[Na+:11]>>[CH3:1][O:2][C:3](=[O:4])[CH:5]([CH3:6])[CH2:7][c:8]1[cH:9][n:10]([Na:11])[c:12]2[n:13][cH:14][cH:15][n:16][c:17]12",
+    "reaction_centers": {
+      "1": "[NaH].c[nH]c>>c[n](c)[Na]",
+      "2": "[NaH].c1cnc2[nH]ccc2n1>>[Na][n]1ccc2nccnc21",
+      "4": "Cc1c[nH]c2nccnc12.[NaH]>>Cc1c[n]([Na])c2nccnc12"
+    },
+    "number_of_reaction_centers": 3
+  },
+  {
+    "id": 10,
+    "mapped_reaction_smiles": "CC[O:15][C:13](=[O:14])[CH:12]=[C:11]1[CH2:10][CH2:9][N:8]([C:6](=[O:7])[O:5][C:2]([CH3:1])([CH3:3])[CH3:4])[CH2:16]1>>[CH3:1][C:2]([CH3:3])([CH3:4])[O:5][C:6](=[O:7])[N:8]1[CH2:9][CH2:10][C:11](=[CH:12][C:13](=[O:14])[OH:15])[CH2:16]1",
+    "reaction_centers": {
+      "1": "CCOC=O>>OC=O",
+      "2": "CCOC(C)=O>>CC(O)=O",
+      "3": "CCOC(=O)C=C>>C=CC(O)=O",
+      "4": "CCOC(=O)C=C(C)C>>CC(C)=CC(O)=O"
+    },
+    "number_of_reaction_centers": 4
+  },
+  {
+    "id": 11,
+    "mapped_reaction_smiles": "[CH3:1][CH2:2][O:3][C:4](=[O:5])[CH2:6][P:8](=[O:9])([O:10][CH3:11])[O:12][CH3:13].[Na+:7]>>[CH3:1][CH2:2][O:3][C:4](=[O:5])[CH:6]([Na:7])[P:8](=[O:9])([O:10][CH3:11])[O:12][CH3:13]",
+    "reaction_centers": {
+      "1": "O=CCP=O.[NaH]>>O=C[CH]([Na])P=O",
+      "2": "OC(=O)CP(O)(O)=O.[NaH]>>OC(=O)[CH]([Na])P(O)(O)=O",
+      "3": "COC(=O)CP(=O)(OC)OC.[NaH]>>COC(=O)[CH]([Na])P(=O)(OC)OC",
+      "4": "CCOC(=O)CP(=O)(OC)OC.[NaH]>>CCOC(=O)[CH]([Na])P(=O)(OC)OC"
+    },
+    "number_of_reaction_centers": 4
+  },
+  {
+    "id": 12,
+    "mapped_reaction_smiles": "[Br][Mg][c:3]1[cH:4][cH:5][n:6][c:7]2[c:8]1[cH:9][n:10][n:11]2[CH2:12][c:13]1[cH:14][cH:15][cH:16][cH:17][cH:18]1.[O:1]=[C:2]1[CH2:19][C:20]([F:21])([F:22])[CH2:23]1>>[OH:1][C:2]1([c:3]2[cH:4][cH:5][n:6][c:7]3[c:8]2[cH:9][n:10][n:11]3[CH2:12][c:13]2[cH:14][cH:15][cH:16][cH:17][cH:18]2)[CH2:19][C:20]([F:21])([F:22])[CH2:23]1",
+    "reaction_centers": {
+      "1": "CC(C)=O.c[c](c)[Mg][Br]>>CC(C)(O)c(c)c",
+      "2": "O=C1CCC1.[Br][Mg][c]1ccnc2nncc12>>OC1(c2ccnc3nncc23)CCC1",
+      "4": "Cn1ncc2[c]([Mg][Br])ccnc21.O=C1CCC1>>Cn1ncc2c(C3(O)CCC3)ccnc21"
+    },
+    "number_of_reaction_centers": 3
+  },
+  {
+    "id": 13,
+    "mapped_reaction_smiles": "N#[N+][c:2]1[cH:3][cH:4][n:5][c:6]2[nH:7][n:8][cH:9][c:10]12.[Br:1][Cu][Br]>>[Br:1][c:2]1[cH:3][cH:4][n:5][c:6]2[nH:7][n:8][cH:9][c:10]12",
+    "reaction_centers": {
+      "1": "[Br][Cu][Br].cc(c)N#N>>cc(c)Br",
+      "2": "N#Nc1ccnc2nncc12.[Br][Cu][Br]>>Brc1ccnc2nncc12"
+    },
+    "number_of_reaction_centers": 2
+  },
+  {
+    "id": 14,
+    "mapped_reaction_smiles": "[F:1][C:2]1([F:3])[CH2:4][CH:5]([c:6]2[cH:7][cH:8][n:10][c:11]3[nH:12][n:13][cH:14][c:15]23)[CH2:16]1.O=P(Cl)([Cl:9])Cl>>[F:1][C:2]1([F:3])[CH2:4][CH:5]([c:6]2[cH:7][c:8]([Cl:9])[n:10][c:11]3[nH:12][n:13][cH:14][c:15]23)[CH2:16]1",
+    "reaction_centers": {
+      "1": "O=P(Cl)(Cl)Cl.ccn>>cc(n)Cl",
+      "2": "O=P(Cl)(Cl)Cl.c1ccncc1>>Clc1ccccn1",
+      "3": "O=P(Cl)(Cl)Cl.c1cnc2nncc2c1>>Clc1ccc2cnnc2n1",
+      "4": "Cc1ccnc2nncc12.O=P(Cl)(Cl)Cl>>Cc1cc(Cl)nc2nncc12"
+    },
+    "number_of_reaction_centers": 4
+  },
+  {
+    "id": 15,
+    "mapped_reaction_smiles": "[CH3:1][O:2][CH2:3][CH2:4][c:5]1[cH:6][cH:7][cH:8][cH:10][n:11]1.O=[N+:9]([O-])O>>[CH3:1][O:2][CH2:3][CH2:4][c:5]1[cH:6][cH:7][c:8]([NH2:9])[cH:10][n:11]1",
+    "reaction_centers": {
+      "1": "ON(O)=O.ccc>>cc(c)N",
+      "2": "ON(O)=O.c1ccncc1>>Nc1cccnc1",
+      "4": "Cc1ccccn1.ON(O)=O>>Cc1ccc(N)cn1"
+    },
+    "number_of_reaction_centers": 3
+  },
+  {
+    "id": 16,
+    "mapped_reaction_smiles": "[CH3:1][c:2]1[n:3][c:4]([N+]#N)[n:6][cH:7][c:8]1[Br:9].[Cl:5][Cu][Cl]>>[CH3:1][c:2]1[n:3][c:4]([Cl:5])[n:6][cH:7][c:8]1[Br:9]",
+    "reaction_centers": {
+      "1": "N#Nc(n)n.[Cl][Cu][Cl]>>nc(n)Cl",
+      "2": "N#Nc1ncccn1.[Cl][Cu][Cl]>>Clc1ncccn1",
+      "4": "Cc1nc(N#N)ncc1Br.[Cl][Cu][Cl]>>Cc1nc(Cl)ncc1Br"
+    },
+    "number_of_reaction_centers": 3
+  },
+  {
+    "id": 17,
+    "mapped_reaction_smiles": "O=[C:2]([OH:1])[c:3]1[n:4][n:5][c:6]2[cH:7][cH:8][c:9]([Br:10])[cH:11][n:12]12>>[OH:1][CH2:2][c:3]1[n:4][n:5][c:6]2[cH:7][cH:8][c:9]([Br:10])[cH:11][n:12]12",
+    "reaction_centers": {
+      "1": "cC(O)=O>>cCO",
+      "2": "OC(=O)c1ncnn1>>OCc1ncnn1",
+      "3": "OC(=O)c1nnc2ccccn12>>OCc1nnc2ccccn12",
+      "4": "OC(=O)c1nnc2ccc(Br)cn12>>OCc1nnc2ccc(Br)cn12"
+    },
+    "number_of_reaction_centers": 4
+  },
+  {
+    "id": 18,
+    "mapped_reaction_smiles": "[CH3:1][CH:2]1[CH2:3][NH:4][CH2:16][C:17]2([CH2:18][CH2:19][CH2:20][CH2:21][CH2:22]2)[O:23]1.O[CH2:5][c:6]1[n:7][n:8][c:9]2[cH:10][cH:11][c:12]([Br:13])[cH:14][n:15]12>>[CH3:1][CH:2]1[CH2:3][N:4]([CH2:5][c:6]2[n:7][n:8][c:9]3[cH:10][cH:11][c:12]([Br:13])[cH:14][n:15]23)[CH2:16][C:17]2([CH2:18][CH2:19][CH2:20][CH2:21][CH2:22]2)[O:23]1",
+    "reaction_centers": {
+      "1": "CNC.cCO>>cCN(C)C",
+      "2": "C1COCCN1.OCc1ncnn1>>C1CN(Cc2ncnn2)CCO1",
+      "3": "C1CCC2(CC1)CNCCO2.OCc1nnc2ccccn12>>C1CCC2(CC1)CN(Cc1nnc3ccccn13)CCO2",
+      "4": "C1CCC2(CC1)CNCCO2.OCc1nnc2ccc(Br)cn12>>Brc1ccc2nnc(CN3CCOC4(CCCCC4)C3)n2c1"
+    },
+    "number_of_reaction_centers": 4
+  },
+  {
+    "id": 19,
+    "mapped_reaction_smiles": "[CH3:1][CH2:2][O:3][C:4](=[O:5])[C@@H:6]1[CH2:7][CH2:8][NH:9][CH2:29][C@@H:30]1[O:31][CH:32]1[CH2:33][CH2:34][CH2:35][CH2:36][O:37]1.[F:17][C:16]([F:18])([F:19])[c:15]1[cH:20][c:21](-[n:22]2[cH:23][cH:24][cH:25][n:26]2)[c:27]2[cH:28][c:10](Cl)[cH:11][cH:12][c:13]2[n:14]1>>[CH3:1][CH2:2][O:3][C:4](=[O:5])[C@@H:6]1[CH2:7][CH2:8][N:9]([c:10]2[cH:11][cH:12][c:13]3[n:14][c:15]([C:16]([F:17])([F:18])[F:19])[cH:20][c:21](-[n:22]4[cH:23][cH:24][cH:25][n:26]4)[c:27]3[cH:28]2)[CH2:29][C@@H:30]1[O:31][CH:32]1[CH2:33][CH2:34][CH2:35][CH2:36][O:37]1",
+    "reaction_centers": {
+      "1": "CNC.cc(c)Cl>>CN(C)c(c)c",
+      "2": "Clc1ccccc1.O[C@H]1CNCC[C@H]1C=O>>O[C@H]1CN(c2ccccc2)CC[C@H]1C=O",
+      "3": "Clc1ccc2ncccc2c1.O[C@H]1CNCC[C@H]1C=O>>O[C@H]1CN(c2ccc3ncccc3c2)CC[C@H]1C=O",
+      "4": "O[C@H]1CNCC[C@H]1C=O.n-c1cc(C(F)(F)F)nc2ccc(Cl)cc12>>n-c1cc(C(F)(F)F)nc2ccc(N3CC[C@@H](C=O)[C@@H](O)C3)cc12"
+    },
+    "number_of_reaction_centers": 4
+  },
+  {
+    "id": 20,
+    "mapped_reaction_smiles": "[O:18]=[C:17]1[CH2:2][CH2:3][CH2:4][N:5]([C:6](=[O:7])[O:8][CH2:9][c:10]2[cH:11][cH:12][cH:13][cH:14][cH:15]2)[CH2:16]1.[Li+:1]>>[Li:1][CH:2]1[CH2:3][CH2:4][N:5]([C:6](=[O:7])[O:8][CH2:9][c:10]2[cH:11][cH:12][cH:13][cH:14][cH:15]2)[CH2:16][C:17]1=[O:18]",
+    "reaction_centers": {
+      "1": "CCC=O.[LiH]>>[Li][CH](C)C=O",
+      "2": "O=C1CCCNC1.[LiH]>>[Li][CH]1CCNCC1=O"
+    },
+    "number_of_reaction_centers": 2
+  },
+  {
+    "id": 21,
+    "mapped_reaction_smiles": "[CH3:11][O:10][c:9]1[cH:8][c:7]([CH2:6][C:4]#N)[n:13]([CH3:14])[n:12]1.[CH3:1][CH2:2][OH:3].[OH2:5]>>[CH3:1][CH2:2][O:3][C:4](=[O:5])[CH2:6][c:7]1[cH:8][c:9]([O:10][CH3:11])[n:12][n:13]1[CH3:14]",
+    "reaction_centers": {
+      "1": "CC#N.CO.O>>COC(C)=O",
+      "2": "CCO.O.cCC#N>>CCOC(=O)Cc",
+      "3": "CCO.O.cc(n)CC#N>>CCOC(=O)Cc(c)n",
+      "4": "CCO.Cn1nccc1CC#N.O>>CCOC(=O)Cc1ccnn1C"
+    },
+    "number_of_reaction_centers": 4
+  },
+  {
+    "id": 22,
+    "mapped_reaction_smiles": "[CH3:1][C:2]([CH3:3])([CH3:4])[C:5](=[O:6])O.[OH:7][CH:8]1[CH2:9][O:10][c:11]2[cH:12][cH:13][cH:14][cH:16][c:17]2[CH2:18]1.[Br:15]Br>>[CH3:1][C:2]([CH3:3])([CH3:4])[C:5](=[O:6])[O:7][CH:8]1[CH2:9][O:10][c:11]2[cH:12][cH:13][c:14]([Br:15])[cH:16][c:17]2[CH2:18]1",
+    "reaction_centers": {
+      "1": "BrBr.CC(O)=O.CO.ccc>>COC(C)=O.cc(c)Br",
+      "2": "BrBr.CC(O)=O.CO.c1ccccc1>>Brc1ccccc1.COC(C)=O",
+      "3": "BrBr.CC(O)=O.OC1COc2ccccc2C1>>CC(=O)OC1COc2ccc(Br)cc2C1"
+    },
+    "number_of_reaction_centers": 3
+  },
+  {
+    "id": 23,
+    "mapped_reaction_smiles": "[CH3:1][C:2]([CH3:3])([CH3:4])[O:5][C:6](=[O:7])[NH:8][CH:9]1[CH2:10][CH2:11][CH2:12][C:13]1=[O:14]>>[CH3:1][C:2]([CH3:3])([CH3:4])[O:5][C:6](=[O:7])[NH:8][C@@H:9]1[CH2:10][CH2:11][CH2:12][CH:13]1[OH:14]",
+    "reaction_centers": {
+      "1": "CC(C)=O>>CC(C)O",
+      "2": "O=C1CCCC1>>N[C@@H]1CCCC1O"
+    },
+    "number_of_reaction_centers": 2
+  },
+  {
+    "id": 24,
+    "mapped_reaction_smiles": "[cH:11]1[cH:12][n:13][c:14]2[nH:6][cH:7][cH:8][c:9]2[n:10]1.Br[CH2:5][c:4]1[cH:3][cH:2][cH:1][cH:16][cH:15]1>>[cH:1]1[cH:2][cH:3][c:4]([CH2:5][n:6]2[cH:7][cH:8][c:9]3[n:10][cH:11][cH:12][n:13][c:14]23)[cH:15][cH:16]1",
+    "reaction_centers": {
+      "1": "cCBr.c[nH]c>>cCn(c)c",
+      "2": "BrCc1ccccc1.c1cnc2[nH]ccc2n1>>C(c1ccccc1)n1ccc2nccnc21"
+    },
+    "number_of_reaction_centers": 2
+  },
+  {
+    "id": 25,
+    "mapped_reaction_smiles": "[F:18][C:17]([F:19])([F:20])[CH:16]1[CH2:15][N:14]([c:13]2[cH:12][cH:11][c:10]([CH2:9]Br)[cH:23][cH:22]2)[CH2:21]1.[CH3:1][c:2]1[cH:3][c:4](=[O:5])[n:6][c:7]([NH2:8])[nH:32]1.[N:30]#[C:29][c:28]1[cH:27][cH:26][cH:25][c:24](Br)[cH:31]1>>[CH3:1][c:2]1[cH:3][c:4](=[O:5])[n:6][c:7]([N:8]([CH2:9][c:10]2[cH:11][cH:12][c:13]([N:14]3[CH2:15][CH:16]([C:17]([F:18])([F:19])[F:20])[CH2:21]3)[cH:22][cH:23]2)[c:24]2[cH:25][cH:26][cH:27][c:28]([C:29]#[N:30])[cH:31]2)[nH:32]1",
+    "reaction_centers": {
+      "1": "cCBr.cN.cc(c)Br>>cCN(c)c(c)c",
+      "2": "BrCc1ccccc1.Brc1ccccc1.Nc1nccc(=O)n1>>O=c1ccnc(N(Cc2ccccc2)c2ccccc2)n1",
+      "4": "Cc1cc(=O)nc(N)n1.N#Cc1cccc(Br)c1.Nc1ccc(CBr)cc1>>Cc1cc(=O)nc(N(Cc2ccc(N)cc2)c2cccc(C#N)c2)n1"
+    },
+    "number_of_reaction_centers": 3
+  },
+  {
+    "id": 26,
+    "mapped_reaction_smiles": "[O:1]=[N+:2]([O-:3])[c:4]1[cH:5][cH:6][cH:7][c:8](Br)[cH:16]1.[Na:14][O:9][c:10]1[cH:11][n:12][nH:13][cH:15]1>>[O:1]=[N+:2]([O-:3])[c:4]1[cH:5][cH:6][cH:7][c:8]([O:9][c:10]2[cH:11][n:12][n:13]([Na:14])[cH:15]2)[cH:16]1",
+    "reaction_centers": {
+      "1": "c[O][Na].c[nH]n.cc(c)Br>>cOc(c)c.c[n](n)[Na]",
+      "2": "Brc1ccccc1.[Na][O]c1cn[nH]c1>>[Na][n]1cc(Oc2ccccc2)cn1",
+      "4": "ON(=O)c1cccc(Br)c1.[Na][O]c1cn[nH]c1>>ON(=O)c1cccc(Oc2cn[n]([Na])c2)c1"
+    },
+    "number_of_reaction_centers": 3
+  },
+  {
+    "id": 27,
+    "mapped_reaction_smiles": "[CH3:1][c:2]1[n:3][o:4][n:5][c:6]1-[c:7]1[n:8][n:9](Cc2ccccc2)[cH:10][c:11]1[N:12]([CH3:13])[CH2:14][CH:15]1[CH2:16][CH2:17][CH2:18][O:19][CH2:20][CH2:21]1>>[CH3:1][c:2]1[n:3][o:4][n:5][c:6]1-[c:7]1[n:8][nH:9][cH:10][c:11]1[N:12]([CH3:13])[CH2:14][CH:15]1[CH2:16][CH2:17][CH2:18][O:19][CH2:20][CH2:21]1",
+    "reaction_centers": {
+      "1": "cn(n)Cc1ccccc1>>c[nH]n",
+      "2": "C(c1ccccc1)n1cccn1>>c1cn[nH]c1",
+      "4": "c-c1nn(Cc2ccccc2)cc1N>>c-c1n[nH]cc1N"
+    },
+    "number_of_reaction_centers": 3
+  },
+  {
+    "id": 28,
+    "mapped_reaction_smiles": "[NH2:3][CH2:4][CH2:5][CH:6]([CH2:7][O:8][C:9]1([CH2:10][OH:11])[CH2:19][CH2:20]1)[C:2](=[O:1])O.Br[CH2:12][c:13]1[cH:14][cH:15][cH:16][cH:17][cH:18]1>>[O:1]=[C:2]1[NH:3][CH2:4][CH2:5][CH:6]1[CH2:7][O:8][C:9]1([CH2:10][O:11][CH2:12][c:13]2[cH:14][cH:15][cH:16][cH:17][cH:18]2)[CH2:19][CH2:20]1",
+    "reaction_centers": {
+      "1": "CC(O)=O.CN.CO.cCBr>>CNC(C)=O.cCOC",
+      "2": "BrCc1ccccc1.CC(O)=O.CN.CO>>COCc1ccccc1.O=C1CCCN1"
+    },
+    "number_of_reaction_centers": 2
+  },
+  {
+    "id": 29,
+    "mapped_reaction_smiles": "CON(C)[C:4](=[O:5])[c:6]1[cH:7][o:8][c:9]2[cH:10][cH:11][c:12]([Br:13])[cH:14][c:15]12.[N:1]#[C:2][CH2:3][Mg][Br]>>[N:1]#[C:2][CH2:3][C:4](=[O:5])[c:6]1[cH:7][o:8][c:9]2[cH:10][cH:11][c:12]([Br:13])[cH:14][c:15]12",
+    "reaction_centers": {
+      "1": "CON(C)C(c)=O.N#C[CH2][Mg][Br]>>cC(=O)CC#N",
+      "2": "CON(C)C(=O)c1ccoc1.N#C[CH2][Mg][Br]>>N#CCC(=O)c1ccoc1",
+      "3": "CON(C)C(=O)c1coc2ccccc12.N#C[CH2][Mg][Br]>>N#CCC(=O)c1coc2ccccc12",
+      "4": "CON(C)C(=O)c1coc2ccc(Br)cc12.N#C[CH2][Mg][Br]>>N#CCC(=O)c1coc2ccc(Br)cc12"
+    },
+    "number_of_reaction_centers": 4
+  },
+  {
+    "id": 30,
+    "mapped_reaction_smiles": "CC(C)(C)OC(=O)[N:7]([CH2:6][c:5]1[cH:4][cH:3][c:2]([O:1][Si](C)(C)C(C)(C)C)[cH:31][cH:30]1)[CH:8]1[CH2:9][N:10]([c:11]2[n:12][c:13]([NH:14][c:15]3[cH:16][cH:17][c:18]([CH:19]([OH:20])[C:21]([F:22])([F:23])[F:24])[cH:25][cH:26]3)[cH:27][s:28]2)[CH2:29]1>>[OH:1][c:2]1[cH:3][cH:4][c:5]([CH2:6][NH:7][CH:8]2[CH2:9][N:10]([c:11]3[n:12][c:13]([NH:14][c:15]4[cH:16][cH:17][c:18]([CH:19]([OH:20])[C:21]([F:22])([F:23])[F:24])[cH:25][cH:26]4)[cH:27][s:28]3)[CH2:29]2)[cH:30][cH:31]1",
+    "reaction_centers": {
+      "1": "CN(C)C(=O)OC(C)(C)C.cO[Si](C)(C)C(C)(C)C>>CNC.cO",
+      "2": "CN(Cc1ccc(O[Si](C)(C)C(C)(C)C)cc1)C(=O)OC(C)(C)C>>CNCc1ccc(O)cc1"
+    },
+    "number_of_reaction_centers": 2
+  },
+  {
+    "id": 31,
+    "mapped_reaction_smiles": "[NH2:14][CH2:15][C:16]([F:17])([F:18])[F:19].[CH3:1][C:2]([CH3:3])([CH3:4])[O:5][C:6](=[O:7])[NH:8][C@@H:9]1[CH2:10][CH2:11][CH2:12][CH:13]1OS(C)(=O)=O>>[CH3:1][C:2]([CH3:3])([CH3:4])[O:5][C:6](=[O:7])[NH:8][C@@H:9]1[CH2:10][CH2:11][CH2:12][CH:13]1[NH:14][CH2:15][C:16]([F:17])([F:18])[F:19]",
+    "reaction_centers": {
+      "1": "CC(C)OS(C)(=O)=O.CN>>CNC(C)C",
+      "2": "CN.CS(=O)(=O)OC1CCC[C@H]1N>>CNC1CCC[C@H]1N"
+    },
+    "number_of_reaction_centers": 2
+  }
+]

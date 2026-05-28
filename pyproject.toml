@@ -1,8 +1,10 @@
 [project]
 name = "chemcensor"
-version = "0.0.1"
+version = "1.0.0"
 readme = "README.md"
 requires-python = ">=3.12"
+license = "LicenseRef-ChemCensor-Benchmark-Evaluation"
+license-files = ["LICENSE"]
 dynamic = ["dependencies", "optional-dependencies"]
 
 [tool.setuptools.dynamic]

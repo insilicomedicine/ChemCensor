@@ -1,7 +1,90 @@
-Copyright (c) 2026 Anonymous Authors
+License Agreement
+(Independent Benchmarking and Evaluation Purposes Only)
 
-This work is licensed under CC BY-NC-ND 4.0.
-https://creativecommons.org/licenses/by-nc-nd/4.0/
+This License Agreement (the "Agreement") forms an agreement between you ("User") and Insilico Medicine AI Limited, a UAE limited liability company with its principal office of business at Level 6, Unit 08, Block A, IRENA HQ Building, Masdar City, Abu Dhabi, United Arab Emirates ("Insilico"), and governs User's use of the Insilico Products (as defined below).
 
-This license is temporary and applies only during the review period.
-The license will be updated upon public release.
+This Agreement is entered into on the earlier of the date User: (a) first downloads, copies, installs or uses any part of the Insilico Products; or (b) first consents to or executes a version of this Agreement (such date, the "Effective Date").
+
+BY USING THE INSILICO PRODUCTS, USER ACKNOWLEDGES THAT USER HAS READ, ACCEPTS, AND AGREES TO BE BOUND BY AND TO COMPLY WITH THIS AGREEMENT, AS AMENDED FROM TIME TO TIME. IF USER DOES NOT ACCEPT AND AGREE TO BE BOUND BY THIS AGREEMENT, USER SHALL IMMEDIATELY CEASE ANY FURTHER USE OF THE INSILICO PRODUCTS.
+
+1. Definitions
+
+1.1 "Independent Benchmarking and Evaluation Purposes" means use solely for assessing, comparing, validating, or reporting the performance of models, algorithms, datasets, or methodologies, without incorporating the Repository, Scoring Method, or Generated Results into any operational, automated, or decision-making workflow.
+
+1.2 "Generated Results" means any outputs produced by leveraging the Repository or Scoring Method, including the direct outputs, derived outputs, scores, rankings, labels, evaluations, annotations, and any cached or stored copies thereof.
+
+1.3 "Insilico Products" means a collection of the Repository, Scoring Method, and any related software, models, and any associated data, content and/or services hosted by Insilico and made available to User(s) under this Agreement.
+
+1.4 "Intellectual Property Right" means any patent application, patent, copyright, moral right, database right, trademark right, trade secret or other intellectual property or proprietary right recognized or enforceable under any national, local or international law.
+
+1.5 "Repository" means the reaction scoring code, algorithms, scripts, documentation, and any associated materials made available under this Agreement.
+
+1.6 "Scoring Method" means the reaction or route scoring methodology implemented in the Repository.
+
+2. Grant of Limited License
+
+2.1 Subject to full compliance with this Agreement, Insilico grants User a non-exclusive, non-transferable, non-sublicensable, revocable license to access, download, and run the Repository solely for Independent Benchmarking and Evaluation Purposes.
+
+2.2 No other rights are granted, whether expressly or by implication.
+
+3. Permitted Uses
+
+3.1 User may use the Repository or Scoring Method to:
+
+a) generate scores for Independent Benchmarking and Evaluation Purposes; and
+
+b) include Generated Results solely in publications, presentations, or reports, or for manual, non-automated scientific analysis, provided that (i) such inclusion does not result in any automated processing or incorporation into any workflow, system, or decision-making process, and (ii) User clearly and accurately states in such publication, presentation, report, or analysis that the applicable Repository and the underlying Scoring Method are owned by Insilico.
+
+4. Prohibited Uses
+
+4.1 User shall not, directly or indirectly, and regardless of whether the use is commercial or non-commercial, engage in any use of the Repository, Scoring Method, or Generated Results outside the scope of the permitted uses set forth in Section 3. For the avoidance of doubt, the following uses shall be deemed a breach of Section 3:
+
+a) integrate the Repository, Scoring Method, or Generated Results into any software system, workflow, pipeline, platform, model, product, or service;
+
+b) use the Repository, Scoring Method, or Generated Results as a reward function, optimization objective, ranking, reranking, filtering, or decision-making component;
+
+c) use the Repository, Scoring Method, or Generated Results for reinforcement learning, fine-tuning, calibration, or training of machine learning or heuristic systems;
+
+d) use the Repository, Scoring Method, or Generated Results for dataset generation, annotation, curation, filtering, or creation of synthetic training data;
+
+e) use the Repository, Scoring Method, or Generated Results in retrosynthesis or forward synthesis systems, whether directly or indirectly; or
+
+f) reuse Generated Results in any automated, adaptive, or feedback-loop process.
+
+4.2 User shall not, and shall not permit any third party to, reverse engineer, decompile, disassemble, analyze, extract, infer, reconstruct, replicate, imitate, or otherwise attempt to derive the Insilico Products, or any underlying logic, structure, parameters, heuristics, weighting, rules, or methodology embodied therein, including by using the Generated Results for model distillation, method replication, or the development of any substantially similar method, model, scoring system, or workflow.
+
+4.3 The restrictions set out in this Section 4 apply regardless of whether the relevant use is internal or external, commercial or non-commercial, research-oriented, automated, or manual.
+
+5. Intellectual Property
+
+5.1 This Agreement does not grant, expressly or by implication, any patent rights, except for the limited Independent Benchmarking and Evaluation Purposes expressly permitted herein.
+
+5.2 Insilico retains ownership of and reserves all Intellectual Property Rights in or related to the Insilico Products (collectively, "Insilico IP"). Insilico does not convey to User any Intellectual Property Right in any Insilico IP except as set forth in this Agreement. All rights not expressly granted by Insilico to User under this Agreement are reserved.
+
+6. No Redistribution
+
+6.1 User shall not redistribute, sublicense, publish, or otherwise make the Insilico Products available to any third party without prior written permission from Insilico.
+
+7. Disclaimer of Warranty
+
+7.1 The Insilico Products are provided "as is" and "as available." Insilico disclaims all warranties, whether express, implied, statutory, or otherwise, including any implied warranties of merchantability, fitness for a particular purpose, title, non-infringement, accuracy, completeness, reliability, or that the Insilico Products will be error-free, uninterrupted, or achieve any particular result.
+
+8. Limitation of Liability
+
+8.1 To the maximum extent permitted by law, Insilico shall not be liable for any damages arising from use of the Insilico Products.
+
+9. Confidentiality
+
+9.1 To the extent that the Repository, Scoring Method, or any non-public materials or information made available under this Agreement are designated as confidential or are reasonably understood to be confidential, User shall keep such materials or information confidential and shall not disclose them to any third party.
+
+9.2 This confidentiality obligation shall not apply to information that is publicly available through no breach of this Agreement.
+
+10. Termination
+
+10.1 Any violation of this License results in automatic termination of all rights granted herein. Upon termination, User shall cease all use and delete all copies of the Insilico Products.
+
+11. Governing Law and Dispute Resolution
+
+11.1 Governing Law. This Agreement is governed by, and will be construed in accordance with, the laws of the State of New York, U.S.A., without regard to its conflict of law provisions and the United Nations Convention on Contracts for the International Sale of Goods.
+
+11.2 Arbitration. Any controversy, claim or dispute arising out of or relating to this Agreement shall be referred to and finally settled by arbitration under the Rules of Arbitration of the International Chamber of Commerce ("ICC Rules") by one or more arbitrators appointed in accordance with the ICC Rules then effective at the time of submission for arbitration. The seat of arbitration shall be New York State, U.S.A.; the number of arbitrators shall be one. The arbitration proceedings and awards shall be confidential and conducted in English.

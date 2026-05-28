@@ -73,6 +73,11 @@ print(score)
 
 ---
 
+## License
+
+ChemCensor is released under a license for **independent benchmarking and evaluation purposes only**. Use in products, pipelines, automated workflows, or redistribution requires prior written permission from Insilico. See [LICENSE](LICENSE) for full terms.
+
+---
 
 ## Citation
 

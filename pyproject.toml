@@ -3,6 +3,8 @@ name = "chemcensor"
 version = "1.0.0"
 readme = "README.md"
 requires-python = ">=3.12"
+license = { file = "LICENSE" }
+license-files = ["LICENSE"]
 dynamic = ["dependencies", "optional-dependencies"]
 
 [tool.setuptools.dynamic]

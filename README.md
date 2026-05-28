@@ -1,45 +1,93 @@
 # ChemCensor
 
-Library for scoring organic reactions against a database of reaction centers (extracted reaction contexts and functional-group signatures).
-It maps and normalizes reactions, detects reaction centers, and compares them to a reference SQLite database.
+[![Dataset](https://img.shields.io/badge/Dataset-Hugging%20Face-FFD21F?style=flat-square&logo=huggingface&logoColor=black)](https://huggingface.co/datasets/insilicomedicine/chemcensor)
+[![Paper](https://img.shields.io/badge/Paper-arXiv%3A2602.03554-B31B1B?style=flat-square&logo=arxiv&logoColor=white)](https://arxiv.org/abs/2602.03554)
 
-## Requirements
+ChemCensor is a precedent-based framework for evaluating reaction chemical plausibility.
+It separates the **reaction center** (what changes) from the **functional-group context** (what must be tolerated), then checks whether similar patterns are supported by known precedents stored in an SQLite database.
 
-- Python 3.12+
-- Dependencies are listed in `requirements/requirements.txt` (RDKit, NumPy, RxnMapper, etc.).
+The resulting **ChemCensor Score** is an integer confidence level from 0 to 5, where higher values indicate stronger precedent support.
 
-## Install
+---
 
-From the repository root:
+## Installation
 
-```bash
-pip install -e .
-```
-
-## Development
 
 ```bash
-pip install -e ".[dev]"
-pre-commit install
-pytest
+python -m pip install -e .
 ```
 
-Linting and static checks (also run in CI):
+---
+
+## Download DB and use with ChemCensor
+
+Below is a complete step-by-step workflow with commands.
+
+### 1) Clone and install ChemCensor
 
 ```bash
-flake8 .
-black . --check
-mypy .
-bandit -c pyproject.toml -r src/chemcensor
+git clone https://github.com/insilicomedicine/ChemCensor.git
+cd ChemCensor
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -U pip
+python -m pip install -e .
 ```
 
-## Usage sketch
+### 2) Download the SQLite database archive
+
+```bash
+mkdir -p data
+hf download insilicomedicine/chemcensor \
+  --repo-type dataset \
+  --include "ChemCensor-DB-U2-1.0.0.sqlite.zip" \
+  --local-dir data
+```
+
+### 3) Unpack the database
+
+```bash
+unzip -j -o data/ChemCensor-DB-U2-1.0.0.sqlite.zip -d data/
+```
+
+After unpacking you should have:
+
+```text
+data/ChemCensor-DB-U2-1.0.0.sqlite
+```
+
+### 4) Use the database in Python
 
 ```python
 from chemcensor import ChemCensor
 
-censor = ChemCensor(db_path="path/to/reaction_centers.db")
-score = censor.score("mapped_reaction_smiles>>product")
+db_path = "data/ChemCensor-DB-U2-1.0.0.sqlite"
+censor = ChemCensor(db_path=db_path)
+
+reaction_smiles = "CCO.CC(=O)O>>CCOC(=O)C"
+score = censor.score(reaction_smiles)
+print(score)
 ```
 
-See tests under `tests/` and `scripts/create_test_db.py` for building a small reference database from fixtures.
+> `db_path` can point to any local `.sqlite` file location; using `data/` is a convenient project convention.
+
+---
+
+
+## Citation
+
+If you use ChemCensor in your work, please cite:
+
+```bibtex
+@misc{zagribelnyy2026singleanswerenoughrethinking,
+      title={When Single Answer Is Not Enough: Rethinking Single-Step Retrosynthesis Benchmarks for LLMs},
+      author={Bogdan Zagribelnyy and Ivan Ilin and Maksim Kuznetsov and Nikita Bondarev and Roman Schutski
+                and Thomas MacDougall and Rim Shayakhmetov and Zulfat Miftakhutdinov
+                and Mikolaj Mizera and Vladimir Aladinskiy and Alex Aliper and Alex Zhavoronkov},
+      year={2026},
+      eprint={2602.03554},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2602.03554}
+}
+```

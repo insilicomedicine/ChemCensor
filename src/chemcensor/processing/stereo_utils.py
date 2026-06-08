@@ -274,6 +274,7 @@ def confirm_center_consistency_in_static_part(
     product_static_assigned_atom_centers: frozenset[int],
     reactants_static_assigned_atom_centers: tuple[frozenset[int], ...],
     reactants_pseudoasymmetric_atom_centers: tuple[frozenset[int], ...],
+    product_pseudoasymmetric_atom_centers: frozenset[int],
 ) -> bool:
     """Confirm that atom stereocenters in the static part are preserved.
 
@@ -283,14 +284,22 @@ def confirm_center_consistency_in_static_part(
     passes :func:`mapped_tetrahedral_center_matches`.
 
     Product-only assigned centers are still treated as inconsistent by default.
-    The only exception is a mapped reactant center already classified as
-    pseudoasymmetric ``r/s`` in :class:`MoleculeStereoSpecification`. A
-    pseudoasymmetric reactant center can legitimately become an ordinary
-    uppercase ``R/S`` center after a remote change elsewhere in the molecule,
-    and that transition should not be counted as a static stereo mismatch. By
-    contrast, reactant ``?`` -> product ``R/S`` belongs to SIS only when there
-    are no dynamic atoms; if the reaction reaches this validator, such a
-    transition is inconsistent.
+    The exceptions concern transitions between ordinary ``R/S`` and
+    pseudoasymmetric ``r/s`` classification, which only reflect a CIP label
+    change driven by a remote (de)symmetrization, not a real change of the local
+    stereo environment:
+
+    * A pseudoasymmetric ``r/s`` reactant center can legitimately become an
+      ordinary ``R/S`` product center when a remote change makes two previously
+      equivalent branches distinct.
+    * Conversely, an assigned ``R/S`` reactant center can legitimately become a
+      pseudoasymmetric ``r/s`` product center when a remote change makes two
+      branches equivalent (e.g. a deprotection that re-symmetrizes the
+      molecule).
+
+    Neither transition is a static stereo mismatch. By contrast, reactant ``?``
+    -> product ``R/S`` belongs to SIS only when there are no dynamic atoms; if
+    the reaction reaches this validator, such a transition is inconsistent.
 
     :param transform: Reaction transform with atom mappings.
     :type transform: ReactionTransform
@@ -303,6 +312,9 @@ def confirm_center_consistency_in_static_part(
     :param reactants_pseudoasymmetric_atom_centers: Reactant pseudoasymmetric
         atom centers grouped by reactant.
     :type reactants_pseudoasymmetric_atom_centers: tuple[frozenset[int], ...]
+    :param product_pseudoasymmetric_atom_centers: Product pseudoasymmetric
+        atom centers.
+    :type product_pseudoasymmetric_atom_centers: frozenset[int]
     :return: ``True`` if all static atom stereocenters are preserved.
     :rtype: bool
 
@@ -319,6 +331,13 @@ def confirm_center_consistency_in_static_part(
         for reactant_atom_idx in reactant_atom_centers:
             mapped_product_idx = transform.Rp_map[reactant_idx][reactant_atom_idx]
             if mapped_product_idx not in product_static_assigned_atom_centers:
+                # An assigned R/S reactant center can legitimately become a
+                # pseudoasymmetric r/s product center after a remote
+                # re-symmetrization (mirror of the r/s -> R/S exception handled
+                # in the product loop below). This is a CIP relabeling, not a
+                # static stereo mismatch.
+                if mapped_product_idx in product_pseudoasymmetric_atom_centers:
+                    continue
                 return False
             expected_reactant_centers.add((reactant_idx, reactant_atom_idx))
 

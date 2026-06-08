@@ -37,6 +37,7 @@ SEAR_TEST_FGS: tuple[frozendict[str, int | str | FunctionalGroupClass], ...] = (
         {
             "idx": 159,
             "name": "Arenes [ch] (meta-EWG)",
+            "ui_name": "Arenes [ch] (meta-EWG)",
             "smarts": "[ch]:1:[c]:[c$(*[N$(*=O),C$(*=[O,S,N]),S$(*=[O]),"
             "C$(*#N)]),c$(*[C]([F,Cl,B,I])([F,Cl,B,I])[F,Cl,B,I]),n]"
             ":[c]:[c]:[c]:1",
@@ -47,6 +48,7 @@ SEAR_TEST_FGS: tuple[frozendict[str, int | str | FunctionalGroupClass], ...] = (
         {
             "idx": 161,
             "name": "Arenes [ch] (ortho-EDG) Type II",
+            "ui_name": "Arenes [ch] (ortho-EDG) Type II",
             "smarts": "[cr6h]:[c$(*[F,Cl,Br,I])]",
             "fg_class": FunctionalGroupClass.SEAR,
         }
@@ -55,6 +57,7 @@ SEAR_TEST_FGS: tuple[frozendict[str, int | str | FunctionalGroupClass], ...] = (
         {
             "idx": 166,
             "name": "Arenes [ch] (ortho-EWG)",
+            "ui_name": "Arenes [ch] (ortho-EWG)",
             "smarts": "[cr6h]:[c$(*[N$(*=O),S$(*=[O]),C$(*#N)]),"
             "c$(*[C]([F,Cl,B,I])([F,Cl,B,I])[F,Cl,B,I]),n]",
             "fg_class": FunctionalGroupClass.SEAR,
@@ -64,6 +67,7 @@ SEAR_TEST_FGS: tuple[frozendict[str, int | str | FunctionalGroupClass], ...] = (
         {
             "idx": 173,
             "name": "Arenes [ch] (para-EWG)",
+            "ui_name": "Arenes [ch] (para-EWG)",
             "smarts": "[ch]:1:[c]:[c]:[c$(*[N$(*=O),C$(*=[O,S,N]),S$(*=[O]),"
             "C$(*#N)]),c$(*[C]([F,Cl,B,I])([F,Cl,B,I])[F,Cl,B,I]),n]"
             ":[c]:[c]:1",

@@ -17,7 +17,13 @@ def fg_to_dict(
 ) -> frozendict[str, int | str | FunctionalGroupClass]:
     """Convert FunctionalGroup to dict for FunctionalGroups initialization."""
     return frozendict(
-        {"idx": fg.idx, "name": fg.name, "smarts": fg.smarts, "fg_class": fg.fg_class}
+        {
+            "idx": fg.idx,
+            "name": fg.name,
+            "ui_name": fg.ui_name,
+            "smarts": fg.smarts,
+            "fg_class": fg.fg_class,
+        }
     )
 
 
@@ -28,6 +34,7 @@ def simple_functional_group_data() -> frozendict[str, int | str | FunctionalGrou
         {
             "idx": 0,
             "name": "Hydroxyl",
+            "ui_name": "Hydroxyl",
             "smarts": "[OH]",
             "fg_class": FunctionalGroupClass.GENERAL,
         }
@@ -41,6 +48,7 @@ def phenol_functional_group_data() -> frozendict[str, int | str | FunctionalGrou
         {
             "idx": 1,
             "name": "Phenol",
+            "ui_name": "Phenol",
             "smarts": "c[OH]",
             "fg_class": FunctionalGroupClass.GENERAL,
         }
@@ -99,6 +107,7 @@ def test_functional_group_invalid_smarts():
     invalid_data = {
         "idx": 0,
         "name": "Invalid",
+        "ui_name": "Invalid",
         "smarts": "invalid_smarts_xyz",
         "fg_class": FunctionalGroupClass.GENERAL,
     }
@@ -141,7 +150,11 @@ def test_functional_group_frozen(hydroxyl_group: FunctionalGroup):
 def test_functional_group_fields():
     """Test functional group fields."""
     fg = FunctionalGroup(
-        idx=0, name="Test", smarts="[OH]", fg_class=FunctionalGroupClass.GENERAL
+        idx=0,
+        name="Test",
+        ui_name="Test",
+        smarts="[OH]",
+        fg_class=FunctionalGroupClass.GENERAL,
     )
     # Check that all fields are set correctly
     assert fg.idx == 0
@@ -167,7 +180,11 @@ def test_matched_group_creation(hydroxyl_group: FunctionalGroup):
 def test_matched_group_immutable_matching_sets():
     """Test that matching_sets are immutable."""
     fg = FunctionalGroup(
-        idx=0, name="Test", smarts="[OH]", fg_class=FunctionalGroupClass.GENERAL
+        idx=0,
+        name="Test",
+        ui_name="Test",
+        smarts="[OH]",
+        fg_class=FunctionalGroupClass.GENERAL,
     )
     matching_sets = ((0,),)
     matched = MatchedGroup(functional_group=fg, matching_sets=matching_sets)
@@ -180,7 +197,11 @@ def test_matched_group_immutable_matching_sets():
 def test_matched_group_frozen():
     """Test that MatchedGroup is immutable (frozen)."""
     fg = FunctionalGroup(
-        idx=0, name="Test", smarts="[OH]", fg_class=FunctionalGroupClass.GENERAL
+        idx=0,
+        name="Test",
+        ui_name="Test",
+        smarts="[OH]",
+        fg_class=FunctionalGroupClass.GENERAL,
     )
     matched = MatchedGroup(functional_group=fg, matching_sets=((0,),))
     with pytest.raises(Exception):  # FrozenInstanceError or AttributeError
@@ -250,6 +271,7 @@ def test_functional_groups_filter_by_class():
             {
                 "idx": 0,
                 "name": "Hydroxyl",
+                "ui_name": "Hydroxyl",
                 "smarts": "[OH]",
                 "fg_class": FunctionalGroupClass.GENERAL,
             }
@@ -258,6 +280,7 @@ def test_functional_groups_filter_by_class():
             {
                 "idx": 1,
                 "name": "Amine",
+                "ui_name": "Amine",
                 "smarts": "[NH2]",
                 "fg_class": FunctionalGroupClass.SKIP,
             }
@@ -266,6 +289,7 @@ def test_functional_groups_filter_by_class():
             {
                 "idx": 2,
                 "name": "Phenol",
+                "ui_name": "Phenol",
                 "smarts": "c[OH]",
                 "fg_class": FunctionalGroupClass.GENERAL,
             }
@@ -291,7 +315,11 @@ def test_functional_groups_filter_by_class():
 def test_functional_groups_caching():
     """Test that identify_functional_groups uses caching."""
     fg = FunctionalGroup(
-        idx=0, name="Hydroxyl", smarts="[OH]", fg_class=FunctionalGroupClass.GENERAL
+        idx=0,
+        name="Hydroxyl",
+        ui_name="Hydroxyl",
+        smarts="[OH]",
+        fg_class=FunctionalGroupClass.GENERAL,
     )
     fgs = FunctionalGroups.from_tuple((fg_to_dict(fg),))
     mol = Molecule("CO")
@@ -320,6 +348,7 @@ def test_functional_groups_initialization_with_list():
             {
                 "idx": 0,
                 "name": "Hydroxyl",
+                "ui_name": "Hydroxyl",
                 "smarts": "[OH]",
                 "fg_class": FunctionalGroupClass.GENERAL,
             }
@@ -328,6 +357,7 @@ def test_functional_groups_initialization_with_list():
             {
                 "idx": 1,
                 "name": "Amine",
+                "ui_name": "Amine",
                 "smarts": "[NH2]",
                 "fg_class": FunctionalGroupClass.SKIP,
             }
@@ -351,7 +381,11 @@ def test_functional_groups_initialization_error():
 def test_matched_group_matching_sets_structure():
     """Test structure of matching_sets in MatchedGroup."""
     fg = FunctionalGroup(
-        idx=0, name="Test", smarts="[OH]", fg_class=FunctionalGroupClass.GENERAL
+        idx=0,
+        name="Test",
+        ui_name="Test",
+        smarts="[OH]",
+        fg_class=FunctionalGroupClass.GENERAL,
     )
     fgs = FunctionalGroups.from_tuple((fg_to_dict(fg),))
 
@@ -386,10 +420,29 @@ def test_functional_group_missing_name():
         FunctionalGroup.from_dict(fg_data)
 
 
+def test_functional_group_missing_ui_name():
+    """Test that FunctionalGroup.from_dict raises error when ui_name is missing."""
+    fg_data = frozendict(
+        {
+            "idx": 0,
+            "name": "Test",
+            "smarts": "[OH]",
+            "fg_class": FunctionalGroupClass.GENERAL,
+        }
+    )
+    with pytest.raises(MissingRequiredKeysError):
+        FunctionalGroup.from_dict(fg_data)
+
+
 def test_functional_group_missing_smarts():
     """Test that FunctionalGroup.from_dict raises error when smarts is missing."""
     fg_data = frozendict(
-        {"idx": 0, "name": "Test", "fg_class": FunctionalGroupClass.GENERAL}
+        {
+            "idx": 0,
+            "name": "Test",
+            "ui_name": "Test",
+            "fg_class": FunctionalGroupClass.GENERAL,
+        }
     )
     with pytest.raises(MissingRequiredKeysError):
         FunctionalGroup.from_dict(fg_data)
@@ -397,7 +450,9 @@ def test_functional_group_missing_smarts():
 
 def test_functional_group_missing_fg_class():
     """Test that FunctionalGroup.from_dict raises error when fg_class is missing."""
-    fg_data = frozendict({"idx": 0, "name": "Test", "smarts": "[OH]"})
+    fg_data = frozendict(
+        {"idx": 0, "name": "Test", "ui_name": "Test", "smarts": "[OH]"}
+    )
     with pytest.raises(MissingRequiredKeysError):
         FunctionalGroup.from_dict(fg_data)
 
@@ -422,6 +477,7 @@ def test_functional_group_invalid_name_type():
         {
             "idx": 0,
             "name": 123,
+            "ui_name": "Test",
             "smarts": "[OH]",
             "fg_class": FunctionalGroupClass.GENERAL,
         }
@@ -436,6 +492,7 @@ def test_functional_group_invalid_smarts_type():
         {
             "idx": 0,
             "name": "Test",
+            "ui_name": "Test",
             "smarts": 123,
             "fg_class": FunctionalGroupClass.GENERAL,
         }
@@ -452,6 +509,7 @@ def test_functional_group_invalid_fg_class_type():
         {
             "idx": 0,
             "name": "Test",
+            "ui_name": "Test",
             "smarts": "[OH]",
             "fg_class": "not_FunctionalGroupClass",
         }
@@ -466,6 +524,7 @@ def test_functional_groups_invalid_smarts_pattern():
         {
             "idx": 0,
             "name": "Invalid",
+            "ui_name": "Invalid",
             "smarts": "[[[invalid_smarts",
             "fg_class": FunctionalGroupClass.GENERAL,
         }

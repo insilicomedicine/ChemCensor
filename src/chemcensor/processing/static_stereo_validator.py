@@ -137,6 +137,9 @@ class StaticStereoValidator:
             frozenset(collect_pseudoasymmetric_centers(reactant_stereo_spec))
             for reactant_stereo_spec in reactants_stereo_specs
         )
+        product_pseudoasymmetric_atom_centers = frozenset(
+            collect_pseudoasymmetric_centers(product_stereo_spec)
+        )
 
         # Nothing to validate if there are no assigned static centers anywhere.
         if (
@@ -155,6 +158,9 @@ class StaticStereoValidator:
             ),
             reactants_pseudoasymmetric_atom_centers=(
                 reactants_pseudoasymmetric_atom_centers
+            ),
+            product_pseudoasymmetric_atom_centers=(
+                product_pseudoasymmetric_atom_centers
             ),
         ):
             raise StaticStereoValidatorInconsistentStaticAtomStereoError(

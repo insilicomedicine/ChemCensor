@@ -32,6 +32,8 @@ class FunctionalGroup:
     :type idx: int
     :param name: Functional group name;
     :type name: str
+    :param ui_name: Functional group user-friendly name;
+    :type ui_name: str
     :param smarts: Functional group SMARTS string;
     :type smarts: str
     :param fg_class: Functional group class;
@@ -40,6 +42,7 @@ class FunctionalGroup:
 
     idx: int
     name: str
+    ui_name: str
     smarts: str
     fg_class: FunctionalGroupClass
 
@@ -76,6 +79,10 @@ class FunctionalGroup:
             raise MissingRequiredKeysError({"name"})
         if not isinstance(name, str):
             raise InvalidDataTypesError(type(name), "name", str)
+        if (ui_name := fg_group_data.get("ui_name")) is None:
+            raise MissingRequiredKeysError({"ui_name"})
+        if not isinstance(ui_name, str):
+            raise InvalidDataTypesError(type(ui_name), "ui_name", str)
         if (smarts := fg_group_data.get("smarts")) is None:
             raise MissingRequiredKeysError({"smarts"})
         if not isinstance(smarts, str):
@@ -90,6 +97,7 @@ class FunctionalGroup:
         return cls(
             idx=int(idx),
             name=str(name),
+            ui_name=str(ui_name),
             smarts=str(smarts),
             fg_class=fg_class,
         )

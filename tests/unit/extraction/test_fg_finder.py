@@ -60,6 +60,7 @@ KETONE_FG: frozendict[str, int | str | FunctionalGroupClass] = frozendict(
     {
         "idx": 0,
         "name": "a-[Ch] ketone",
+        "ui_name": "a-[Ch] ketone",
         "smarts": "[CX4&h][C](=[O])[#6]",
         "fg_class": FunctionalGroupClass.GENERAL,
     }
@@ -68,6 +69,7 @@ PHENOL_FG: frozendict[str, int | str | FunctionalGroupClass] = frozendict(
     {
         "idx": 1,
         "name": "phenol c-[Oh]",
+        "ui_name": "phenol c-[Oh]",
         "smarts": "[c;!$(*n)&!$(*:1:a:a:n:a:a:1)][Oh]",
         "fg_class": FunctionalGroupClass.GENERAL,
     }
@@ -76,6 +78,7 @@ SEAR1_FG: frozendict[str, int | str | FunctionalGroupClass] = frozendict(
     {
         "idx": 2,
         "name": "Arenes [ch] (ortho-EWG) Type II",
+        "ui_name": "Arenes [ch] (ortho-EWG) Type II",
         "smarts": "[cr6h]:[c$(*[C]=[O,S,N])]",
         "fg_class": FunctionalGroupClass.SEAR,
     }
@@ -84,6 +87,7 @@ SEAR2_FG: frozendict[str, int | str | FunctionalGroupClass] = frozendict(
     {
         "idx": 3,
         "name": "Arenes [ch] (ortho-EDG) Type VI",
+        "ui_name": "Arenes [ch] (ortho-EDG) Type VI",
         "smarts": "[cr6h]:[c$(*[NX3!$(*=O),SX2])]",
         "fg_class": FunctionalGroupClass.SEAR,
     }
@@ -92,6 +96,7 @@ METHYL_ESTER_FG: frozendict[str, int | str | FunctionalGroupClass] = frozendict(
     {
         "idx": 4,
         "name": "Carboxylic ester (methyl) COOCH3",
+        "ui_name": "Carboxylic ester (methyl) COOCH3",
         "smarts": "[C;X3&z2](=[O])[O][CH3]",
         "fg_class": FunctionalGroupClass.GENERAL,
     }
@@ -100,6 +105,7 @@ PYRIDINE_FG: frozendict[str, int | str | FunctionalGroupClass] = frozendict(
     {
         "idx": 5,
         "name": "Pyridine",
+        "ui_name": "Pyridine",
         "smarts": "[c,n]:1:[n,c]:[c,n]:[n]:[c,n]:[c,n]:1",
         "fg_class": FunctionalGroupClass.SKIP,
     }
@@ -108,6 +114,7 @@ SEAR3_FG: frozendict[str, int | str | FunctionalGroupClass] = frozendict(
     {
         "idx": 6,
         "name": "Arenes [ch] (ortho-EDG) Type III",
+        "ui_name": "Arenes [ch] (ortho-EDG) Type III",
         "smarts": "[cr6h]:[c;$(*[O;+0H1,-1H0])]",
         "fg_class": FunctionalGroupClass.SEAR,
     }

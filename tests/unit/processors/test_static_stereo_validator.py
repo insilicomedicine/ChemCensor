@@ -264,3 +264,27 @@ def test_consistent_static_centers_near_the_rc_pass(
     processed = ReactionProcessor().process(reaction)
     assert processed.dummy is False
     assert processed.is_sis_reaction is False
+
+
+# Reactions where a remote change (re)symmetrizes the molecule, so an assigned
+# R/S reactant center legitimately becomes a pseudoasymmetric r/s product
+# center. This is a CIP relabeling, not a static stereo mismatch.
+REACTION_SMILES_WITH_RS_TO_PSEUDOASYMMETRIC_STATIC_CENTERS: tuple[str, ...] = (
+    # TMS deprotection: the base-bearing ring carbon turns R -> r once both
+    # ring arms become identical -CH2-CH(OH)-.
+    "C[Si](C)(C)O[C@@H]1C[C@H](n2cnc3c(N)nc(N)nc32)C[C@@H]1O>>"
+    "Nc1nc(N)c2ncn([C@H]3C[C@@H](O)[C@@H](O)C3)c2n1",
+)
+
+
+@pytest.mark.parametrize(
+    "reaction_smiles",
+    REACTION_SMILES_WITH_RS_TO_PSEUDOASYMMETRIC_STATIC_CENTERS,
+)
+def test_rs_to_pseudoasymmetric_static_center_passes(
+    reaction_smiles: str,
+):
+    reaction = Reaction(reaction_smiles=reaction_smiles)
+    processed = ReactionProcessor().process(reaction)
+    assert processed.dummy is False
+    assert processed.is_sis_reaction is False

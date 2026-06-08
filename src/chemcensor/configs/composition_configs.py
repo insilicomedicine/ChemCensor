@@ -11,5 +11,5 @@ class CompositionConfig(IntEnum):
     components
     """
 
-    default_batch_size = 100
+    default_batch_size = 32
     distributivity_threshold = 2

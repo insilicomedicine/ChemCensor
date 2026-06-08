@@ -46,4 +46,5 @@ data_test/
 debug.ipynb
 tests/unit/extraction/fixtures/legacy_rc.json
 dev.ipynb
+tmp/
 data/

@@ -75,7 +75,15 @@ _SQL_INSERT_REACTION = (
 
 
 class DBManager:
-    """Manages the reaction centers database backed by an in-memory SQLite store."""
+    """Manages the reaction centers database backed by an in-memory SQLite store.
+
+    The default connection is an in-memory database created via
+    :meth:`__init__` or copied from a file via :meth:`load`.  For massively
+    parallel read-only access (e.g. the parallel scoring pipeline) prefer
+    :meth:`open_readonly`, which attaches an immutable file-backed connection
+    so that all worker processes share the same OS page cache and the
+    database is not duplicated in RAM.
+    """
 
     def __init__(
         self,
@@ -88,6 +96,7 @@ class DBManager:
         """
         self._conn: sqlite3.Connection = sqlite3.connect(":memory:")
         self._conn.execute("PRAGMA foreign_keys = ON")
+        self._readonly: bool = False
 
         if init_db:
             self._conn.executescript(_SCHEMA)
@@ -111,6 +120,50 @@ class DBManager:
 
         return manager
 
+    @classmethod
+    def open_readonly(cls, db_path: str | PathLike) -> DBManager:
+        """Open a database file in shared read-only mode (no in-memory copy).
+
+        The connection is opened with ``mode=ro&immutable=1`` so SQLite knows
+        the file will not change and skips locking; multiple processes can
+        attach to the same file and share its pages via the OS page cache.
+        Useful for parallel scoring where the database would otherwise be
+        duplicated per worker.
+
+        Write methods raise :class:`RuntimeError` for managers opened this
+        way.
+
+        :param db_path: The path to the SQLite database file.
+        :type db_path: str | PathLike
+        :return: A read-only DBManager backed by the file on disk.
+        :rtype: DBManager
+        :raises DBManagerFileNotFoundError: If the database file is missing.
+        """
+        path = Path(db_path)
+        if not path.exists():
+            raise DBManagerFileNotFoundError(f"Database file not found: {path}")
+
+        # Bypass the default :memory: connection to avoid wasting RAM.
+        manager = cls.__new__(cls)
+        manager._conn = sqlite3.connect(
+            f"file:{path}?mode=ro&immutable=1",
+            uri=True,
+            check_same_thread=False,
+        )
+        manager._readonly = True
+        return manager
+
+    def _ensure_writable(self) -> None:
+        """Raise if this manager was opened in read-only mode.
+
+        :raises RuntimeError: If the manager is read-only.
+        """
+        if self._readonly:
+            raise RuntimeError(
+                "DBManager is opened in read-only mode; "
+                "write operations are not allowed."
+            )
+
     def dump(self, db_path: str | PathLike) -> None:
         """Write the in-memory database to an SQLite file on disk.
 
@@ -119,6 +172,7 @@ class DBManager:
         :param db_path: Destination path for the SQLite database.
         :type db_path: str | PathLike
         """
+        self._ensure_writable()
         path = Path(db_path)
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists():
@@ -154,6 +208,7 @@ class DBManager:
         :param fg_signature: The FG-signature of the reaction center.
         :type fg_signature: np.ndarray
         """
+        self._ensure_writable()
         self._conn.execute(
             _SQL_UPDATE_RC_FG,
             (fg_signature.astype(np.uint8).tobytes(), reaction_center_smiles),
@@ -179,6 +234,7 @@ class DBManager:
             centers).
         :type components: list[str] | None
         """
+        self._ensure_writable()
         self._conn.execute(
             _SQL_INSERT_RC,
             (
@@ -209,6 +265,7 @@ class DBManager:
         :param sear_signature: SEAr context signature for this pair.
         :type sear_signature: np.ndarray
         """
+        self._ensure_writable()
         self._conn.execute(
             _SQL_INSERT_CTR,
             (
@@ -348,6 +405,7 @@ class DBManager:
         :param document_id: The document ID where the reaction originates.
         :type document_id: str
         """
+        self._ensure_writable()
         self._conn.execute(
             _SQL_INSERT_REACTION,
             (reaction_smiles, document_id),

@@ -34,6 +34,7 @@ class ChemCensor:
         manager: DBManager | None = None,
         max_center_type: int | ReactionCenterType = 4,
         find_exact_match: bool = True,
+        processor: ReactionProcessor | None = None,
     ) -> None:
         """Initialize ChemCensor from a database path or an existing DBManager.
 
@@ -50,6 +51,12 @@ class ChemCensor:
             on hit. Set to ``False`` to skip this check and always score via
             reaction centers.
         :type find_exact_match: bool
+        :param processor: Optional pre-built :class:`ReactionProcessor`. When
+            omitted, a default pipeline including
+            :class:`~chemcensor.processing.Mapper` is created. Pass a custom
+            lightweight processor (e.g. without ``Mapper``) when reactions
+            are pre-mapped upstream — used by the parallel scoring pipeline.
+        :type processor: ReactionProcessor | None
         """
         if db_path is not None and manager is not None:
             raise ValueError(
@@ -68,7 +75,7 @@ class ChemCensor:
         except ValueError:
             raise InvalidCenterTypeError(max_center_type) from None
 
-        self._processor = ReactionProcessor()
+        self._processor = processor if processor is not None else ReactionProcessor()
         self._rc_extractor = ReactionCenterExtractor(max_center_type=max_center_type)
         self._find_exact_match = find_exact_match
 
@@ -115,6 +122,28 @@ class ChemCensor:
         except ProcessingError:
             return ScoringConfig.failed_reaction_scoring.value
 
+        return self.score_processed(reaction)
+
+    def score_processed(self, reaction: Reaction) -> float:
+        """Score a reaction that already went through processing.
+
+        Use this when the processing pipeline has been split across
+        processes — for example in the parallel scorer worker, where atom
+        mapping happens in a dedicated mapper process and the lightweight
+        processor in the worker continues from
+        :class:`~chemcensor.processing.OrphanRemover` onwards.
+
+        Performs steps 2 and 3 of :meth:`score`: optional exact-match
+        lookup, reaction-center extraction and DB-based scoring.
+
+        :param reaction: Reaction that has already been processed by a
+            :class:`~chemcensor.processing.reaction_processor.ReactionProcessor`
+            (i.e. it has ``canonical_smiles`` populated, SIS / tautomer
+            flags set, etc.).
+        :type reaction: Reaction
+        :return: Score from config (exact_match / lc_N / default / failed).
+        :rtype: float
+        """
         if reaction.dummy:
             return ScoringConfig.failed_reaction_scoring.value
 

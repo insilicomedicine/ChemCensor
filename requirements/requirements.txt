@@ -1,5 +1,6 @@
 frozendict==2.4.6
 numpy==1.26.4
-rdkit>=2025.3.5
+rdkit>=2025.3.5,<2026.0.0
 transformers==4.57.6
 rxnmapper==0.4.2
+tqdm>=4.67.1

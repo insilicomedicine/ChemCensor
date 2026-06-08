@@ -1,6 +1,6 @@
 [project]
 name = "chemcensor"
-version = "1.0.0"
+version = "1.1.1"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "LicenseRef-ChemCensor-Benchmark-Evaluation"
@@ -40,3 +40,6 @@ exclude_dirs = ["tests"]
 [build-system]
 requires = ["setuptools>=43.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-data]
+chemcensor = ["**/*.so"]

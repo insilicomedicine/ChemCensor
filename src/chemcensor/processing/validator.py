@@ -16,12 +16,19 @@ from .utils import length_check
 from .utils import syntax_check
 from .utils import validate_smiles_in_rdkit
 
-DEFAULT_VALIDATORS: Sequence[Callable[[str], None]] = (
-    length_check,
+# Validators applied regardless of input length. The ``length_check`` exists
+# only to keep inputs within the atom-mapper's (rxnmapper) limits; pipelines
+# that map elsewhere (e.g. FakeMapper reusing precomputed maps) can drop it.
+_VALIDATORS_WITHOUT_LENGTH: Sequence[Callable[[str], None]] = (
     syntax_check,
     check_coordinate_bonds,
     at_least_one_carbon_check,
     validate_smiles_in_rdkit,
+)
+
+DEFAULT_VALIDATORS: Sequence[Callable[[str], None]] = (
+    length_check,
+    *_VALIDATORS_WITHOUT_LENGTH,
 )
 
 
@@ -32,14 +39,27 @@ class Validator:
 
     def __init__(
         self,
-        validators: Sequence[Callable[[str], None]] = DEFAULT_VALIDATORS,
+        validators: Sequence[Callable[[str], None]] | None = None,
+        *,
+        check_length: bool = True,
     ) -> None:
         """
         Initialize Validator with validators.
 
-        :param validators: Sequence of validators to use.
-        :type validators: Sequence[Callable[[str], None]]
+        :param validators: Explicit validators to use; when ``None`` (default)
+            a standard set is used, with or without the length check depending
+            on ``check_length``.
+        :type validators: Sequence[Callable[[str], None]] | None
+        :param check_length: When ``True`` (default) enforce the 1-512 char
+            reaction-SMILES limit. Set ``False`` when the atom mapping is
+            precomputed (FakeMapper) so oversized reactions are not rejected.
+            Ignored when ``validators`` is provided explicitly.
+        :type check_length: bool
         """
+        if validators is None:
+            validators = (
+                DEFAULT_VALIDATORS if check_length else _VALIDATORS_WITHOUT_LENGTH
+            )
         self.validators = validators or DEFAULT_VALIDATORS
 
     def process(self, reaction: Reaction) -> Reaction:

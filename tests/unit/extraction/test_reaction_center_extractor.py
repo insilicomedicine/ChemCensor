@@ -560,3 +560,28 @@ def test_no_extra_hydrogens_in_static_part_of_rc_smiles(
     rc_smiles = rc2.reaction_center_smiles
     assert "H" not in rc_smiles
     assert rc_smiles == "C1CN(Cc2ccccc2)CCN1>>C1CNCCN1"
+
+
+def test_reaction_with_hydrogen_in_rc(
+    processor: ReactionProcessor,
+    rc_extractor: ReactionCenterExtractor,
+) -> None:
+    """Reaction with hydrogen in the RC."""
+    smiles1 = (
+        "CC(C)P(c1cc([B-](c2ccc(F)c(F)c2)(c2ccc(F)c(F)c2)c2ccc(F)c(F)c2)"
+        "ccc1P(c1ccccc1)c1ccccc1)C(C)C.COCCOC.Cl.[Li+]>>CC(C)[P]1(C(C)C)"
+        "[H+][P](c2ccccc2)(c2ccccc2)c2ccc([B-](c3ccc(F)c(F)c3)(c3ccc(F)c(F)c3)"
+        "c3ccc(F)c(F)c3)cc21"
+    )
+    smiles2 = (
+        "CN(CCCCCCCCCCCO)CCCCCCCCCCCO.Br.O.[H].[Na+].[W].[Zn]"
+        ">>"
+        "CN(CCCCCCCCCCCO)CCCCCCCCCCCO.O.[H+].[W].[Zn]"
+    )
+    for smiles in [smiles1, smiles2]:
+        reaction = Reaction(reaction_smiles=smiles)
+        reaction = processor.process(reaction)
+        reaction = rc_extractor.extract_rc(reaction)
+        rc1 = reaction.get_reaction_center_by_type(ReactionCenterType.RC1)
+        rc_smiles = rc1.reaction_center_smiles
+        assert "H" in rc_smiles

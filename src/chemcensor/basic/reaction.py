@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from dataclasses import field
 from functools import partial
+from typing import Any
 
 import numpy as np
 from frozendict import frozendict
@@ -30,6 +31,7 @@ class Reaction:
     is_tautomerization_reaction: bool = False
     dummy: bool = False
     document_id: str = ""
+    meta: frozendict[str, Any] = field(default_factory=frozendict)
 
     def get_reaction_center_by_type(
         self, center_type: ReactionCenterType

@@ -2,6 +2,14 @@ import copy
 
 from rdkit import Chem
 
+# Upper bound on the molecule's automorphism count above which symmetric-match
+# expansion is skipped. Highly symmetric molecules (e.g. multiple equivalent
+# silyl protecting groups) make the VF2 subgraph search in
+# ``GetSubstructMatches`` below blow up combinatorially and effectively hang.
+# The value 1000 was selected as a number of automorphisms for a reactant
+# from tests (see test_utils.py)
+MAX_AUTOMORPHISMS_FOR_SYMMETRIC_EXPANSION = 1000
+
 
 def clean_hydrogens_from_smarts(smarts: str, keep_stars: bool = True) -> str:
     """Remove hydrogens from SMARTS string.
@@ -54,6 +62,15 @@ def find_symmetric_matches(
     """
     # Fragment covers the whole molecule → nothing to expand
     if pattern.GetNumAtoms() == mol.GetNumAtoms():
+        return ()
+
+    # Guard against pathologically symmetric molecules
+    self_matches = mol.GetSubstructMatches(
+        mol,
+        uniquify=False,
+        maxMatches=MAX_AUTOMORPHISMS_FOR_SYMMETRIC_EXPANSION,
+    )
+    if len(self_matches) >= MAX_AUTOMORPHISMS_FOR_SYMMETRIC_EXPANSION:
         return ()
 
     mol = copy.deepcopy(mol)

@@ -1,6 +1,8 @@
 from .base import Processor
 from .batch_filter import BatchFilter
 from .cano_rxn_annotator import CanoRxnAnnotator
+from .fake_mapper import ATOM_MAPS_META_KEY
+from .fake_mapper import FakeMapper
 from .mapper import Mapper
 from .orphan_remover import OrphanRemover
 from .reaction_processor import ReactionProcessor
@@ -19,6 +21,8 @@ from .validator import Validator
 __all__ = [
     "Validator",
     "Mapper",
+    "FakeMapper",
+    "ATOM_MAPS_META_KEY",
     "CanoRxnAnnotator",
     "Processor",
     "OrphanRemover",

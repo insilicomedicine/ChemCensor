@@ -5,6 +5,8 @@ from .errors.validator_errors import RxnSmilesLengthError
 from .errors.validator_errors import RxnSmilesNoCarbonError
 from .errors.validator_errors import RxnSmilesRDKitError
 from .errors.validator_errors import RxnSmilesSyntaxError
+from .fake_mapper import ATOM_MAPS_META_KEY
+from chemcensor.basic.errors.molecule_errors import InvalidSMILESError
 
 
 def length_check(reaction_smiles: str) -> None:
@@ -89,3 +91,57 @@ def validate_smiles_in_rdkit(reaction_smiles: str) -> None:
             raise RxnSmilesRDKitError(
                 msg=f"Invalid smiles: {smiles}", reaction_smiles=reaction_smiles
             )
+
+
+def extract_atom_map_numbers(smiles: str):
+    """Extract atom map numbers from a SMILES string.
+
+    :param smiles: SMILES string to extract atom map numbers from.
+    :type smiles: str
+
+    :return: Dictionary of atom map numbers.
+    :rtype: dict
+    """
+    mol = Chem.MolFromSmiles(smiles)
+    if mol is None:
+        raise InvalidSMILESError(smiles)
+    # Map: rdkit index -> atom map number (only if atom map is present and > 0)
+    amap = {}
+    for atom in mol.GetAtoms():
+        idx = atom.GetIdx()
+        map_num = atom.GetAtomMapNum()
+        if map_num > 0:
+            amap[idx] = map_num
+    return amap
+
+
+def prepare_fake_mapper_meta_from_mapped_rxn(mapped_rxn_smiles: str) -> dict:
+    """
+    Given an atom-mapped reaction SMILES, produce the metadata dictionary
+    for FakeMapper as expected in Reaction.meta.
+    {
+        "reactants": ( {atom_idx: map_num, ...}, ... ),
+        "product": {atom_idx: map_num, ...}
+    }
+
+    :param mapped_rxn_smiles: Atom-mapped reaction SMILES.
+    :type mapped_rxn_smiles: str
+
+    :return: Metadata dictionary for FakeMapper.
+    :rtype: dict
+
+    :raises ValueError: If input is not a reaction SMILES or if SMILES is invalid.
+    """
+
+    if ">>" not in mapped_rxn_smiles:
+        raise RxnSmilesSyntaxError(
+            msg="Input is not a reaction SMILES: missing '>>'",
+            reaction_smiles=mapped_rxn_smiles,
+        )
+    reactant_part, product_part = mapped_rxn_smiles.split(">>")
+
+    reactant_frags = reactant_part.split(".") if reactant_part else []
+
+    reactants_maps = tuple(extract_atom_map_numbers(frag) for frag in reactant_frags)
+    product_map = extract_atom_map_numbers(product_part)
+    return {ATOM_MAPS_META_KEY: {"reactants": reactants_maps, "product": product_map}}

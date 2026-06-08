@@ -360,8 +360,9 @@ class MolecularFragmentExtractor:
             atom = mol.GetAtomWithIdx(idx)
 
             if (
-                idx in self._core_indices or atom.GetAtomMapNum() == 0
-            ) and atom.GetFormalCharge() == 0:
+                (idx in self._core_indices or atom.GetAtomMapNum() == 0)
+                and atom.GetFormalCharge() == 0
+            ) or atom.GetSymbol() == "H":
                 smarts: str = atom.GetSmarts()
             else:
                 smarts = clean_hydrogens_from_smarts(

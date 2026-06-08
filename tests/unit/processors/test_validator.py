@@ -110,6 +110,34 @@ def test_invalid_smiles_raises_rxn_smiles_rdkit_error(
     )
 
 
+def _long_reaction(n: int = 600) -> Reaction:
+    # Valid reaction whose SMILES exceeds the 512-char length limit.
+    chain = "C" * n
+    return Reaction(reaction_smiles=f"{chain}O>>{chain}O")
+
+
+def test_length_check_rejects_oversized_reaction_by_default() -> None:
+    """By default an oversized reaction SMILES raises a length ValidationError."""
+    with pytest.raises(ValidationError) as exc_info:
+        Validator().process(_long_reaction())
+    assert exc_info.value.msg == "Reaction smiles must be 1-512 characters."
+
+
+def test_check_length_false_allows_oversized_reaction() -> None:
+    """With ``check_length=False`` an oversized reaction passes validation."""
+    reaction = _long_reaction()
+    result = Validator(check_length=False).process(reaction)
+    assert result.reaction_smiles == reaction.reaction_smiles
+
+
+def test_check_length_false_still_runs_other_validators() -> None:
+    """Disabling the length check keeps the remaining validators active."""
+    with pytest.raises(ValidationError):
+        Validator(check_length=False).process(
+            Reaction(reaction_smiles="C1=NC=CC=C>>CC2=NC=CC=C2")
+        )
+
+
 def test_reaction_batch_passes(
     validator: Validator, reaction_batch: list[Reaction]
 ) -> None:

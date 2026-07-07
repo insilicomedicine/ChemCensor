@@ -7,10 +7,16 @@ from pathlib import Path
 import pytest
 from rdkit import Chem
 
+from chemcensor.basic import Reaction
+from chemcensor.basic import ReactionCenterType
+from chemcensor.chemcensor import ScoreResult
 from chemcensor.configs.scoring_configs import ScoringConfig
+from chemcensor.db.manager import DBManager
+from chemcensor.extraction import ReactionCenterExtractor
 from chemcensor.parallel import ParallelConfig
 from chemcensor.parallel import score_batch
 from chemcensor.parallel import score_file
+from chemcensor.processing.reaction_processor import ReactionProcessor
 
 
 _THIS_DIR = Path(__file__).resolve().parent
@@ -81,7 +87,7 @@ def test_score_batch_returns_exact_match_for_in_db_fixtures(
         for fid in EXACT_MATCH_FIXTURE_IDS
     ]
     scores = score_batch(smiles_list, db_path=db_path, config=small_config)
-    expected = ScoringConfig.exact_match_scoring.value
+    expected = ScoreResult.uniform(ScoringConfig.exact_match_scoring.value)
     assert scores == [expected] * len(smiles_list)
 
 
@@ -95,7 +101,8 @@ def test_score_batch_returns_failed_for_garbage(
         db_path=db_path,
         config=small_config,
     )
-    assert scores == [ScoringConfig.failed_reaction_scoring.value] * 2
+    failed = ScoreResult.uniform(ScoringConfig.failed_reaction_scoring.value)
+    assert scores == [failed] * 2
 
 
 @pytest.mark.heavy_test
@@ -106,8 +113,8 @@ def test_score_batch_preserves_input_order(
     valid = _strip_atom_maps(_get_fixture(1)["mapped_reaction_smiles"])
     inputs = [">>", valid, "not-a-reaction", valid]
     scores = score_batch(inputs, db_path=db_path, config=small_config)
-    failed = ScoringConfig.failed_reaction_scoring.value
-    exact = ScoringConfig.exact_match_scoring.value
+    failed = ScoreResult.uniform(ScoringConfig.failed_reaction_scoring.value)
+    exact = ScoreResult.uniform(ScoringConfig.exact_match_scoring.value)
     assert scores == [failed, exact, failed, exact]
 
 
@@ -119,8 +126,8 @@ def test_score_batch_return_dict(db_path: Path, small_config: ParallelConfig) ->
         [valid, ">>"], db_path=db_path, config=small_config, return_dict=True
     )
     assert scores == {
-        0: ScoringConfig.exact_match_scoring.value,
-        1: ScoringConfig.failed_reaction_scoring.value,
+        0: ScoreResult.uniform(ScoringConfig.exact_match_scoring.value),
+        1: ScoreResult.uniform(ScoringConfig.failed_reaction_scoring.value),
     }
 
 
@@ -128,7 +135,7 @@ def test_score_batch_return_dict(db_path: Path, small_config: ParallelConfig) ->
 def test_score_file_writes_results(
     tmp_path: Path, db_path: Path, small_config: ParallelConfig
 ) -> None:
-    """``score_file`` writes ``idx,smiles,score`` rows for every input row."""
+    """``score_file`` writes one row per input with both score columns."""
     valid = _strip_atom_maps(_get_fixture(1)["mapped_reaction_smiles"])
     input_csv = tmp_path / "in.csv"
     output_csv = tmp_path / "out.csv"
@@ -149,17 +156,18 @@ def test_score_file_writes_results(
     with open(output_csv, encoding="utf-8") as fh:
         rows = list(csv.reader(fh))
 
-    assert rows[0] == ["idx", "smiles", "score"]
+    assert rows[0] == ["idx", "smiles", "score_with_fg", "score_without_fg"]
     failed = ScoringConfig.failed_reaction_scoring.value
     exact = ScoringConfig.exact_match_scoring.value
 
-    seen = {int(r[0]): float(r[2]) for r in rows[1:]}
+    # Both score columns carry the same value for exact-match / failed rows.
+    seen = {int(r[0]): (float(r[2]), float(r[3])) for r in rows[1:]}
     # All three input rows reach the worker — ">>" is a non-empty SMILES
     # so the reader keeps it; the worker resolves it to ``failed``.
     assert set(seen) == {0, 1, 2}
-    assert seen[0] == exact
-    assert seen[1] == failed
-    assert seen[2] == exact
+    assert seen[0] == (exact, exact)
+    assert seen[1] == (failed, failed)
+    assert seen[2] == (exact, exact)
 
 
 @pytest.mark.heavy_test
@@ -201,9 +209,9 @@ def test_resume_does_not_duplicate_out_of_order_rows(
     already_done = [0, 1, 2, 4, 5]
     with open(output_csv, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
-        w.writerow(["idx", "smiles", "score"])
+        w.writerow(["idx", "smiles", "score_with_fg", "score_without_fg"])
         for i in already_done:
-            w.writerow([i, inputs[i], 0.0])
+            w.writerow([i, inputs[i], 0.0, 0.0])
 
     ckpt_mod.save(
         ckpt,
@@ -235,7 +243,7 @@ def test_resume_does_not_duplicate_out_of_order_rows(
     with open(output_csv, encoding="utf-8") as fh:
         rows = list(csv.reader(fh))
 
-    assert rows[0] == ["idx", "smiles", "score"]
+    assert rows[0] == ["idx", "smiles", "score_with_fg", "score_without_fg"]
     written = [int(r[0]) for r in rows[1:]]
     # Every input scored exactly once — no duplicates from re-feeding 4/5.
     assert sorted(written) == list(range(7))
@@ -281,7 +289,7 @@ def test_maxtasksperchild_recycle_scores_all_inputs(db_path: Path) -> None:
 
     scores = score_batch(inputs, db_path=db_path, config=config, return_dict=True)
 
-    exact = ScoringConfig.exact_match_scoring.value
+    exact = ScoreResult.uniform(ScoringConfig.exact_match_scoring.value)
     assert set(scores) == set(range(len(inputs)))
     assert all(scores[i] == exact for i in range(len(inputs)))
 
@@ -326,3 +334,62 @@ def test_score_file_resume_from_checkpoint(
     with open(output_csv, encoding="utf-8") as fh:
         second_run = list(csv.reader(fh))[1:]
     assert second_run == first_run
+
+
+# Fixture 19 with an extra nitro group on the remote ester arm: the RC1 center
+# is unchanged (so it matches a DB entry built from the original fixture), but
+# the added functional group makes the RC1 FG sub-signature no longer a subset
+# of the stored reference. Mirrors the constant in ``test_chemcensor.py``.
+FIXTURE_19_WITH_EXTRA_FG_RXN_SMILES = (
+    "CC([N+]([O-])=O)OC([C@@H]1CCNC[C@@H]1OC2CCCCO2)=O."
+    "FC(F)(c(cc3n4nccc4)nc5c3cc(Cl)cc5)F>>"
+    "CC([N+]([O-])=O)OC([C@@H]6CCN(C[C@@H]6OC7CCCCO7)c(cc8)cc9c8nc(C(F)(F)F)"
+    "cc9n%10nccc%10)=O"
+)
+
+
+@pytest.mark.heavy_test
+def test_score_batch_distinguishes_fg_variants(tmp_path: Path) -> None:
+    """``score_batch`` reports both FG variants per reaction in one pass.
+
+    The DB holds fixture 19's genuine RC1 center and FG signature; the scored
+    reaction adds an extra functional group, so the center is found but its FG
+    sub-signature no longer matches. The single returned ``ScoreResult`` must
+    carry ``default`` with the FG check and ``lc_1`` without it.
+    """
+    original_smiles = _strip_atom_maps(_get_fixture(19)["mapped_reaction_smiles"])
+    original = ReactionProcessor().process(Reaction(reaction_smiles=original_smiles))
+    original = ReactionCenterExtractor(
+        max_center_type=ReactionCenterType.RC1
+    ).extract_rc(original)
+    original_rc1 = original.reaction_centers[ReactionCenterType.RC1]
+
+    db = DBManager()
+    db.add_reaction_center(
+        original_rc1.reaction_center_smiles,
+        original_rc1.fg_signature,
+    )
+    db_file = tmp_path / "rc19.db"
+    db.dump(db_file)
+
+    config = ParallelConfig(
+        n_workers=1,
+        mapper_threads=1,
+        batch_size=1,
+        mapper_internal_batch_size=1,
+        max_center_type=1,
+        find_exact_match=False,
+        progress=False,
+        checkpoint_interval=0,
+    )
+
+    scores = score_batch(
+        [FIXTURE_19_WITH_EXTRA_FG_RXN_SMILES], db_path=db_file, config=config
+    )
+
+    assert scores == [
+        ScoreResult(
+            with_functional_groups=ScoringConfig.default_reaction_scoring.value,
+            without_functional_groups=ScoringConfig.lc_1_scoring.value,
+        )
+    ]

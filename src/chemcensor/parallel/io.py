@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Protocol
 
 
-_RESULT_HEADER = ("idx", "smiles", "score")
+_RESULT_HEADER = ("idx", "smiles", "score_with_fg", "score_without_fg")
 
 
 def iter_csv_smiles(
@@ -64,11 +64,11 @@ class ResultSink(Protocol):
     underlying storage (a file, a Python list, ...).
     """
 
-    def write(self, items: Iterable[tuple[int, str, float]]) -> None:
-        """Append a batch of ``(idx, smiles, score)`` tuples.
+    def write(self, items: Iterable[tuple[int, str, float, float]]) -> None:
+        """Append a batch of ``(idx, smiles, score_with_fg, score_without_fg)``.
 
         :param items: Iterable of result rows.
-        :type items: Iterable[tuple[int, str, float]]
+        :type items: Iterable[tuple[int, str, float, float]]
         """
         ...
 
@@ -87,9 +87,9 @@ class ListSink:
     """
 
     def __init__(self) -> None:
-        self._items: list[tuple[int, str, float]] = []
+        self._items: list[tuple[int, str, float, float]] = []
 
-    def write(self, items: Iterable[tuple[int, str, float]]) -> None:
+    def write(self, items: Iterable[tuple[int, str, float, float]]) -> None:
         self._items.extend(items)
 
     def close(self) -> None:
@@ -97,13 +97,13 @@ class ListSink:
         return None
 
     @property
-    def items(self) -> list[tuple[int, str, float]]:
-        """Return collected ``(idx, smiles, score)`` tuples."""
+    def items(self) -> list[tuple[int, str, float, float]]:
+        """Return collected ``(idx, smiles, score_with_fg, score_without_fg)``."""
         return self._items
 
 
 class CsvSink:
-    """File-backed sink that streams ``(idx, smiles, score)`` rows to CSV.
+    """Stream ``(idx, smiles, score_with_fg, score_without_fg)`` rows to CSV.
 
     Supports append mode for resume: when ``append=True`` and the file
     already exists, the header is not rewritten.
@@ -121,7 +121,7 @@ class CsvSink:
             self._writer.writerow(_RESULT_HEADER)
             self._fh.flush()
 
-    def write(self, items: Iterable[tuple[int, str, float]]) -> None:
+    def write(self, items: Iterable[tuple[int, str, float, float]]) -> None:
         self._writer.writerows(items)
         self._fh.flush()
 

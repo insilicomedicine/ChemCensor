@@ -5,6 +5,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Literal
 from typing import overload
+from typing import TYPE_CHECKING
 
 from . import checkpoint as ckpt_mod
 from .config import ParallelConfig
@@ -16,6 +17,10 @@ from .io import CsvSink
 from .io import iter_csv_smiles
 from .io import ListSink
 from .orchestrator import run as _run_pipeline
+
+
+if TYPE_CHECKING:
+    from chemcensor.chemcensor import ScoreResult
 
 
 __all__ = [
@@ -36,7 +41,7 @@ def score_batch(
     db_path: str | PathLike,
     config: ParallelConfig | None = ...,
     return_dict: Literal[False] = False,
-) -> list[float]: ...
+) -> list["ScoreResult"]: ...
 
 
 @overload
@@ -46,7 +51,7 @@ def score_batch(
     db_path: str | PathLike,
     config: ParallelConfig | None = ...,
     return_dict: Literal[True],
-) -> dict[int, float]: ...
+) -> dict[int, "ScoreResult"]: ...
 
 
 def score_batch(
@@ -55,12 +60,16 @@ def score_batch(
     db_path: str | PathLike,
     config: ParallelConfig | None = None,
     return_dict: bool = False,
-) -> list[float] | dict[int, float]:
+) -> list["ScoreResult"] | dict[int, "ScoreResult"]:
     """Score an in-memory iterable of reaction SMILES.
 
     Materialises the iterable to fix indices, then runs the pipeline
     and re-orders the results so the returned list aligns with the
     input.  For very large inputs prefer :func:`score_file`.
+
+    Each entry is a :class:`~chemcensor.chemcensor.ScoreResult` holding both
+    the functional-group aware and functional-group agnostic scores, produced
+    in a single pass.
 
     :param smiles: Iterable of raw reaction SMILES strings.
     :type smiles: Iterable[str]
@@ -69,14 +78,16 @@ def score_batch(
     :param config: Pipeline configuration. ``None`` uses defaults
         (auto-scaling on CPU count).
     :type config: ParallelConfig | None
-    :param return_dict: When ``True``, return ``dict[int, float]``
+    :param return_dict: When ``True``, return ``dict[int, ScoreResult]``
         keyed by the input position; when ``False`` (default) return
-        ``list[float]`` in the original input order.
+        ``list[ScoreResult]`` in the original input order.
     :type return_dict: bool
-    :return: Per-input scores either as a list (input order) or as a
+    :return: Per-input results either as a list (input order) or as a
         dict keyed by input index.
-    :rtype: list[float] | dict[int, float]
+    :rtype: list[ScoreResult] | dict[int, ScoreResult]
     """
+    from chemcensor.chemcensor import ScoreResult
+
     cfg = (config or ParallelConfig()).resolved()
     smiles_list = list(smiles)
     source = list(enumerate(smiles_list))
@@ -91,13 +102,24 @@ def score_batch(
     )
 
     if return_dict:
-        return {idx: score for idx, _smi, score in sink.items}
+        return {
+            idx: ScoreResult(
+                with_functional_groups=with_fg,
+                without_functional_groups=without_fg,
+            )
+            for idx, _smi, with_fg, without_fg in sink.items
+        }
 
     failed_default = _failed_score()
-    out: list[float] = [failed_default] * len(smiles_list)
-    for idx, _smi, score in sink.items:
+    out: list[ScoreResult] = [
+        ScoreResult.uniform(failed_default) for _ in range(len(smiles_list))
+    ]
+    for idx, _smi, with_fg, without_fg in sink.items:
         if 0 <= idx < len(out):
-            out[idx] = score
+            out[idx] = ScoreResult(
+                with_functional_groups=with_fg,
+                without_functional_groups=without_fg,
+            )
     return out
 
 
@@ -113,8 +135,10 @@ def score_file(
 ) -> None:
     """Score a CSV file of reactions and stream results to another CSV.
 
-    The output file gains three columns: ``idx`` (the 0-based input
-    row index), ``smiles`` (the raw input SMILES) and ``score``.  Rows
+    The output file gains four columns: ``idx`` (the 0-based input row
+    index), ``smiles`` (the raw input SMILES), ``score_with_fg`` (score
+    requiring the functional-group sub-signature to match) and
+    ``score_without_fg`` (score on reaction-center presence only). Rows
     are written in the order workers complete them — *not* input
     order; sort by ``idx`` post-hoc if you need it.
 

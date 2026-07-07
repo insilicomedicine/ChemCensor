@@ -90,6 +90,8 @@ def _build_worker_state(
         )
     )
     manager = DBManager.open_readonly(db_path)
+    # Both score variants are emitted per reaction, so the worker does not
+    # select between them — ``evaluate_processed`` ignores this flag.
     censor = ChemCensor(
         manager=manager,
         processor=light_processor,
@@ -161,10 +163,10 @@ def run_scorer(
                 break
             assert isinstance(task, ScoreTask)
 
-            results: list[tuple[int, str, float]] = []
+            results: list[tuple[int, str, float, float]] = []
             for idx, raw_smi, mapped_smi in task.items:
                 if mapped_smi is None:
-                    results.append((idx, raw_smi, failed_score))
+                    results.append((idx, raw_smi, failed_score, failed_score))
                     continue
 
                 reaction = Reaction(
@@ -173,16 +175,18 @@ def run_scorer(
                 )
                 try:
                     processed = processor.process(reaction)
-                    score = censor.score_processed(processed)
+                    result = censor.evaluate_processed(processed)
+                    with_fg = result.with_functional_groups
+                    without_fg = result.without_functional_groups
                 except ProcessingError:
-                    score = failed_score
+                    with_fg = without_fg = failed_score
                 except Exception as e:  # last-ditch safety net
                     logger.exception(
                         "Unexpected error while scoring %r: %s", raw_smi, e
                     )
-                    score = failed_score
+                    with_fg = without_fg = failed_score
 
-                results.append((idx, raw_smi, float(score)))
+                results.append((idx, raw_smi, float(with_fg), float(without_fg)))
 
             result_queue.put(Result(batch_id=task.batch_id, items=tuple(results)))
 

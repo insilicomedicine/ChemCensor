@@ -1,6 +1,6 @@
 [project]
 name = "chemcensor"
-version = "1.1.2"
+version = "1.2.0"
 readme = "README.md"
 requires-python = ">=3.12"
 license = "LicenseRef-ChemCensor-Benchmark-Evaluation"

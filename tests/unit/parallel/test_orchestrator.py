@@ -63,7 +63,7 @@ def test_periodic_checkpoint_fires_when_batch_size_does_not_divide_interval(
     messages = [
         Result(
             batch_id=b,
-            items=tuple((b * 3 + j, f"R{b * 3 + j}>>P", 1.0) for j in range(3)),
+            items=tuple((b * 3 + j, f"R{b * 3 + j}>>P", 1.0, 1.0) for j in range(3)),
         )
         for b in range(4)
     ]
@@ -100,9 +100,9 @@ def test_checkpoint_delta_counts_from_resumed_state(
     # Resume at 100; first batch adds 2 (→102, delta 2 < 5: no save),
     # second batch adds 2 (→104, delta 4 < 5: no save) until the threshold.
     messages = [
-        Result(batch_id=0, items=((100, "a>>b", 1.0), (101, "c>>d", 1.0))),
-        Result(batch_id=1, items=((102, "e>>f", 1.0), (103, "g>>h", 1.0))),
-        Result(batch_id=2, items=((104, "i>>j", 1.0), (105, "k>>l", 1.0))),
+        Result(batch_id=0, items=((100, "a>>b", 1.0, 1.0), (101, "c>>d", 1.0, 1.0))),
+        Result(batch_id=1, items=((102, "e>>f", 1.0, 1.0), (103, "g>>h", 1.0, 1.0))),
+        Result(batch_id=2, items=((104, "i>>j", 1.0, 1.0), (105, "k>>l", 1.0, 1.0))),
     ]
 
     _run_writer(

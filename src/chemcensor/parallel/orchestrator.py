@@ -177,7 +177,7 @@ def _writer_thread(
             completed_total += len(msg.items)
 
             # Advance ``last_contiguous`` over any indices that fill the gap.
-            for idx, _smi, _score in msg.items:
+            for idx, *_rest in msg.items:
                 if idx == last_contiguous + 1:
                     last_contiguous += 1
                     while last_contiguous + 1 in pending_above:
@@ -305,7 +305,8 @@ def run(
 
     :param source: Iterable yielding ``(idx, smiles)`` records.
     :type source: Iterable[tuple[int, str]]
-    :param sink: Sink that receives ``(idx, smiles, score)`` results.
+    :param sink: Sink that receives
+        ``(idx, smiles, score_with_fg, score_without_fg)`` results.
     :type sink: ResultSink
     :param db_path: Path to the SQLite reaction-centers database.
     :type db_path: str | PathLike

@@ -12,10 +12,32 @@ The resulting **ChemCensor Score** is an integer confidence level from 0 to 5, w
 
 ## Installation
 
+Requires Python ≥ 3.12.
 
 ```bash
-python -m pip install -e .
+python -m pip install -e .            # runtime dependencies
+python -m pip install -e ".[dev]"     # + dev/test tooling
 ```
+
+Dependencies are pinned in `requirements/requirements.txt` (runtime) and
+`requirements/requirements-dev.txt` (development).
+
+---
+
+## Scoring scale
+
+`score()` returns a single float; `evaluate()` returns both functional-group
+variants. The possible values (`ScoringConfig`):
+
+| Value  | Meaning                                              |
+| ------ | --------------------------------------------------- |
+| `5.0`  | Exact match — canonical reaction SMILES is in the DB |
+| `4.0`  | Reaction center of type RC4 matched                  |
+| `3.0`  | Reaction center of type RC3 matched                  |
+| `2.0`  | Reaction center of type RC2 matched                  |
+| `1.0`  | RC1 matched (also SIS / tautomerization reactions)   |
+| `0.0`  | Default — no center matched                           |
+| `-1.0` | Failed — reaction could not be processed             |
 
 ---
 
@@ -73,6 +95,115 @@ print(score)
 
 ---
 
+## Usage
+
+The examples below use `data/ChemCensor-DB-U2-1.0.0.sqlite` from the workflow
+above;
+
+### Single reaction (in-process)
+
+```python
+from chemcensor import ChemCensor
+
+censor = ChemCensor(db_path="data/ChemCensor-DB-U2-1.0.0.sqlite")
+score = censor.score("CCO.CC(=O)O>>CCOC(=O)C")
+```
+
+Constructor options (keyword-only):
+
+- `db_path` **or** `manager` — exactly one reaction-center DB source.
+- `max_center_type` — highest reaction-center type to extract (1–4, default 4).
+- `find_exact_match` — short-circuit to `5.0` on a canonical-SMILES hit
+  (default `True`).
+- `check_functional_groups` — require each center's functional-group
+  sub-signature to match the DB reference (default `True`). Affects only
+  `score()` / `score_processed()`.
+
+### Both score variants in one pass
+
+`evaluate()` runs the (expensive) pipeline once and returns a `ScoreResult`
+with both the functional-group aware and agnostic scores:
+
+```python
+from chemcensor import ChemCensor, ScoreResult
+
+censor = ChemCensor(db_path="data/ChemCensor-DB-U2-1.0.0.sqlite")
+result: ScoreResult = censor.evaluate("CCO.CC(=O)O>>CCOC(=O)C")
+
+result.with_functional_groups        # score requiring FG sub-signature match
+result.without_functional_groups     # score on reaction-center presence only
+result.select(check_functional_groups=False)  # pick one by flag
+```
+
+### Batch scoring in parallel (in-process)
+
+```python
+from chemcensor.parallel import score_batch, ParallelConfig
+
+db_path = "data/ChemCensor-DB-U2-1.0.0.sqlite"
+
+# list[ScoreResult], aligned with input order
+results = score_batch(["CCO.CC(=O)O>>CCOC(=O)C", "A>>B"], db_path=db_path)
+results[0].with_functional_groups
+
+# or dict[int, ScoreResult] keyed by input position
+as_dict = score_batch(smiles, db_path=db_path, return_dict=True)
+```
+
+### Scoring a CSV file
+
+`score_file` streams results to an output CSV with the columns
+`idx, smiles, score_with_fg, score_without_fg`. Rows are written as workers
+complete them (not input order) — sort by `idx` if needed.
+
+```python
+from chemcensor.parallel import score_file, ParallelConfig
+
+score_file(
+    input_path="in.csv",
+    output_path="out.csv",
+    db_path="data/ChemCensor-DB-U2-1.0.0.sqlite",
+    smiles_column="reaction_smiles",
+    config=ParallelConfig(n_workers=8),  # None = autoscale to CPU count
+    checkpoint_path="run.ckpt",          # optional, enables resume
+)
+```
+
+Or from the command line:
+
+```bash
+python scripts/score_parallel.py in.csv out.csv --db data/ChemCensor-DB-U2-1.0.0.sqlite
+```
+
+Useful flags: `--workers N`, `--smiles-column NAME`, `--checkpoint run.ckpt`,
+`--fake-mapper` (reuse precomputed atom maps instead of running rxnmapper),
+`--no-exact-match`, `--max-center-type {1,2,3,4}`.
+
+---
+
+## Building the reaction-center database
+
+Compose a database from a reference CSV of reactions:
+
+```bash
+python scripts/compose_database.py reactions.csv rc_db.db \
+    --reaction-smiles-column cleaned_rxn \
+    --document-id-column PatentNumber
+```
+
+---
+
+## Development
+
+```bash
+python -m pip install -e ".[dev]"
+pre-commit run --all-files     # lint / format / type checks
+pytest                         # run the test suite
+pytest -m "not heavy_test"     # skip the heavy parallel integration tests
+```
+
+---
+
 ## License
 
 ChemCensor is released under a license for **independent benchmarking and evaluation purposes only**. Use in products, pipelines, automated workflows, or redistribution requires prior written permission from Insilico. See [LICENSE](LICENSE) for full terms.
@@ -94,5 +225,19 @@ If you use ChemCensor in your work, please cite:
       archivePrefix={arXiv},
       primaryClass={cs.LG},
       url={https://arxiv.org/abs/2602.03554}
+}
+```
+
+and/or:
+
+```bibtex
+@misc{zagribelnyy2026ursachemistryawarebenchmarkutilitarian,
+      title={URSA: Chemistry-Aware Benchmark for Utilitarian Retrosynthesis Assessment},
+      author={Bogdan Zagribelnyy and Ivan Ilin and Nikita Bondarev and Anton Morgunov and Arkadii Lin and Maksim Kuznetsov and Rim Shayakhmetov and Vladimir Aladinskiy and Alex Aliper and Alex Zhavoronkov},
+      year={2026},
+      eprint={2607.04688},
+      archivePrefix={arXiv},
+      primaryClass={cs.LG},
+      url={https://arxiv.org/abs/2607.04688},
 }
 ```

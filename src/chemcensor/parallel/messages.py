@@ -42,11 +42,16 @@ class ScoreTask:
 class Result:
     """Scored records emitted by a scorer process.
 
+    Each record carries both scoring variants produced in a single
+    evaluation: the functional-group aware score and the functional-group
+    agnostic score (see :class:`~chemcensor.chemcensor.ScoreResult`).
+
     :param batch_id: Id propagated from the originating :class:`ScoreTask`.
     :type batch_id: int
-    :param items: Tuple of ``(idx, raw_smiles, score)``.
-    :type items: tuple[tuple[int, str, float], ...]
+    :param items: Tuple of
+        ``(idx, raw_smiles, score_with_fg, score_without_fg)``.
+    :type items: tuple[tuple[int, str, float, float], ...]
     """
 
     batch_id: int
-    items: tuple[tuple[int, str, float], ...]
+    items: tuple[tuple[int, str, float, float], ...]

@@ -87,41 +87,44 @@ def test_iter_csv_smiles_missing_column_raises(tmp_path: Path) -> None:
 
 def test_list_sink_collects() -> None:
     sink = ListSink()
-    sink.write([(0, "A>>B", 1.0), (1, "C>>D", 2.0)])
-    sink.write([(2, "E>>F", 3.0)])
+    sink.write([(0, "A>>B", 1.0, 1.0), (1, "C>>D", 2.0, 3.0)])
+    sink.write([(2, "E>>F", 3.0, 4.0)])
     sink.close()
     assert sink.items == [
-        (0, "A>>B", 1.0),
-        (1, "C>>D", 2.0),
-        (2, "E>>F", 3.0),
+        (0, "A>>B", 1.0, 1.0),
+        (1, "C>>D", 2.0, 3.0),
+        (2, "E>>F", 3.0, 4.0),
     ]
 
 
 def test_csv_sink_writes_header_and_rows(tmp_path: Path) -> None:
     out = tmp_path / "out.csv"
     with CsvSink(out) as sink:
-        sink.write([(0, "A>>B", 1.0)])
-        sink.write([(1, "C>>D", 2.0)])
+        sink.write([(0, "A>>B", 1.0, 1.0)])
+        sink.write([(1, "C>>D", 2.0, 3.0)])
 
     with open(out, encoding="utf-8") as fh:
         rows = list(csv.reader(fh))
-    assert rows[0] == ["idx", "smiles", "score"]
-    assert rows[1:] == [["0", "A>>B", "1.0"], ["1", "C>>D", "2.0"]]
+    assert rows[0] == ["idx", "smiles", "score_with_fg", "score_without_fg"]
+    assert rows[1:] == [
+        ["0", "A>>B", "1.0", "1.0"],
+        ["1", "C>>D", "2.0", "3.0"],
+    ]
 
 
 def test_csv_sink_append_does_not_duplicate_header(tmp_path: Path) -> None:
     out = tmp_path / "out.csv"
     with CsvSink(out) as sink:
-        sink.write([(0, "A>>B", 1.0)])
+        sink.write([(0, "A>>B", 1.0, 1.0)])
     with CsvSink(out, append=True) as sink:
-        sink.write([(1, "C>>D", 2.0)])
+        sink.write([(1, "C>>D", 2.0, 3.0)])
 
     with open(out, encoding="utf-8") as fh:
         rows = list(csv.reader(fh))
     assert rows == [
-        ["idx", "smiles", "score"],
-        ["0", "A>>B", "1.0"],
-        ["1", "C>>D", "2.0"],
+        ["idx", "smiles", "score_with_fg", "score_without_fg"],
+        ["0", "A>>B", "1.0", "1.0"],
+        ["1", "C>>D", "2.0", "3.0"],
     ]
 
 
@@ -129,7 +132,7 @@ def test_csv_sink_append_to_empty_file_writes_header(tmp_path: Path) -> None:
     out = tmp_path / "out.csv"
     out.touch()  # empty file
     with CsvSink(out, append=True) as sink:
-        sink.write([(0, "A>>B", 1.0)])
+        sink.write([(0, "A>>B", 1.0, 1.0)])
     with open(out, encoding="utf-8") as fh:
         rows = list(csv.reader(fh))
-    assert rows[0] == ["idx", "smiles", "score"]
+    assert rows[0] == ["idx", "smiles", "score_with_fg", "score_without_fg"]

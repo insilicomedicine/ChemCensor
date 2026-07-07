@@ -10,6 +10,7 @@ from rdkit import Chem
 from chemcensor.basic import Reaction
 from chemcensor.basic import ReactionCenterType
 from chemcensor.chemcensor import ChemCensor
+from chemcensor.chemcensor import ScoreResult
 from chemcensor.configs.scoring_configs import ScoringConfig
 from chemcensor.db.manager import DBManager
 from chemcensor.errors import InvalidCenterTypeError
@@ -162,6 +163,165 @@ def test_score_returns_default_when_only_unrelated_center_in_db() -> None:
     score = censor.score(smiles)
 
     assert score == ScoringConfig.default_reaction_scoring.value
+
+
+# ---------------------------------------------------------------------------
+# check_functional_groups flag: center present in DB but FG signature differs
+# ---------------------------------------------------------------------------
+
+# Fixture 19 (an aryl C–N coupling) with an extra nitro group grafted onto the
+# remote ester arm. The reaction center (CNC.cc(c)Cl>>CN(C)c(c)c) is unchanged,
+# so it still matches the DB entry built from the original fixture, but the
+# added functional group makes the RC1 FG sub-signature no longer a subset of
+# the stored reference.
+FIXTURE_19_WITH_EXTRA_FG_RXN_SMILES = (
+    "CC([N+]([O-])=O)OC([C@@H]1CCNC[C@@H]1OC2CCCCO2)=O."
+    "FC(F)(c(cc3n4nccc4)nc5c3cc(Cl)cc5)F>>"
+    "CC([N+]([O-])=O)OC([C@@H]6CCN(C[C@@H]6OC7CCCCO7)c(cc8)cc9c8nc(C(F)(F)F)"
+    "cc9n%10nccc%10)=O"
+)
+
+
+def test_score_center_in_db_with_nonmatching_fg() -> None:
+    """A center present in the DB but with a non-matching FG sub-signature.
+
+    The DB stores fixture 19's real RC1 center and its real FG signature. We
+    then score a variant of the same reaction with an extra functional group
+    (a nitro group on a remote arm): the reaction center is identical, so it is
+    found in the DB, but its FG sub-signature now contains a bit absent from the
+    stored reference.
+
+    With ``check_functional_groups=True`` (default) the center does not count
+    and scoring falls back to ``default_reaction_scoring``. With the flag set to
+    ``False`` the center is scored on DB presence alone → ``lc_1_scoring``.
+    """
+    original_smiles = _strip_atom_maps(_get_fixture(19)["mapped_reaction_smiles"])
+
+    # Build the DB from the ORIGINAL reaction: store its RC1 center together with
+    # its genuine FG signature (no artificial zeroing).
+    original = ReactionProcessor().process(Reaction(reaction_smiles=original_smiles))
+    original = ReactionCenterExtractor(
+        max_center_type=ReactionCenterType.RC1
+    ).extract_rc(original)
+    original_rc1 = original.reaction_centers[ReactionCenterType.RC1]
+
+    db = DBManager()
+    db.add_reaction_center(
+        original_rc1.reaction_center_smiles,
+        original_rc1.fg_signature,
+    )
+
+    modified_smiles = FIXTURE_19_WITH_EXTRA_FG_RXN_SMILES
+
+    with_fg_check = ChemCensor(
+        manager=db,
+        max_center_type=1,
+        find_exact_match=False,
+        check_functional_groups=True,
+    )
+    assert (
+        with_fg_check.score(modified_smiles)
+        == ScoringConfig.default_reaction_scoring.value
+    )
+
+    without_fg_check = ChemCensor(
+        manager=db,
+        max_center_type=1,
+        find_exact_match=False,
+        check_functional_groups=False,
+    )
+    assert without_fg_check.score(modified_smiles) == ScoringConfig.lc_1_scoring.value
+
+
+# ---------------------------------------------------------------------------
+# evaluate() / ScoreResult: both FG variants in a single pass
+# ---------------------------------------------------------------------------
+
+
+def test_score_result_uniform_and_select() -> None:
+    """``ScoreResult.uniform`` sets both variants; ``select`` picks one."""
+    uniform = ScoreResult.uniform(3.0)
+    assert uniform.with_functional_groups == 3.0
+    assert uniform.without_functional_groups == 3.0
+
+    result = ScoreResult(with_functional_groups=0.0, without_functional_groups=1.0)
+    assert result.select(check_functional_groups=True) == 0.0
+    assert result.select(check_functional_groups=False) == 1.0
+
+
+def test_evaluate_returns_uniform_for_exact_match(db_path: Path) -> None:
+    """A reaction in the DB scores ``exact_match`` for both variants."""
+    smiles = _strip_atom_maps(_get_fixture(1)["mapped_reaction_smiles"])
+    censor = ChemCensor(db_path=db_path)
+
+    result = censor.evaluate(smiles)
+
+    expected = ScoringConfig.exact_match_scoring.value
+    assert result == ScoreResult.uniform(expected)
+
+
+def test_evaluate_returns_uniform_for_failed_reaction(db_path: Path) -> None:
+    """An unprocessable reaction scores ``failed`` for both variants."""
+    censor = ChemCensor(db_path=db_path)
+
+    result = censor.evaluate("not-a-reaction")
+
+    failed = ScoringConfig.failed_reaction_scoring.value
+    assert result == ScoreResult.uniform(failed)
+
+
+def test_evaluate_distinguishes_fg_variants_in_single_pass() -> None:
+    """``evaluate`` returns differing scores when the FG sub-signature fails.
+
+    Same setup as :func:`test_score_center_in_db_with_nonmatching_fg`: the DB
+    holds fixture 19's RC1 center with its genuine FG signature, and we score a
+    variant carrying an extra functional group. A single ``evaluate`` call must
+    report ``default`` with the FG check and ``lc_1`` without it.
+    """
+    original_smiles = _strip_atom_maps(_get_fixture(19)["mapped_reaction_smiles"])
+    original = ReactionProcessor().process(Reaction(reaction_smiles=original_smiles))
+    original = ReactionCenterExtractor(
+        max_center_type=ReactionCenterType.RC1
+    ).extract_rc(original)
+    original_rc1 = original.reaction_centers[ReactionCenterType.RC1]
+
+    db = DBManager()
+    db.add_reaction_center(
+        original_rc1.reaction_center_smiles,
+        original_rc1.fg_signature,
+    )
+
+    censor = ChemCensor(manager=db, max_center_type=1, find_exact_match=False)
+    result = censor.evaluate(FIXTURE_19_WITH_EXTRA_FG_RXN_SMILES)
+
+    assert result == ScoreResult(
+        with_functional_groups=ScoringConfig.default_reaction_scoring.value,
+        without_functional_groups=ScoringConfig.lc_1_scoring.value,
+    )
+
+
+@pytest.mark.parametrize("check_functional_groups", [True, False])
+def test_evaluate_select_matches_score(
+    db_path: Path, check_functional_groups: bool
+) -> None:
+    """``evaluate(...).select(flag)`` equals ``score`` of a censor with that flag.
+
+    Verified across an in-DB fixture, an out-of-DB fixture and a failed
+    reaction so both early-exit and per-center paths are covered.
+    """
+    smiles_inputs = [
+        _strip_atom_maps(_get_fixture(1)["mapped_reaction_smiles"]),
+        _strip_atom_maps(_get_fixture(6)["mapped_reaction_smiles"]),
+        "not-a-reaction",
+    ]
+    censor = ChemCensor(
+        db_path=db_path, check_functional_groups=check_functional_groups
+    )
+
+    for smiles in smiles_inputs:
+        assert censor.evaluate(smiles).select(check_functional_groups) == censor.score(
+            smiles
+        )
 
 
 # ---------------------------------------------------------------------------

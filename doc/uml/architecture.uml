@@ -8,6 +8,7 @@ classDiagram
     ChemCensor --> ReactionProcessor
     ChemCensor --> ReactionCenterExtractor
     ChemCensor --> ScoringConfig
+    ChemCensor --> ScoreResult
 
     ReactionCenterDBComposer --> DBManager
     ReactionCenterDBComposer --> Processor
@@ -88,7 +89,11 @@ classDiagram
         -ReactionProcessor processor
         -ReactionCenterExtractor rc_extractor
         -bool find_exact_match
+        -bool check_functional_groups
+        +evaluate(str reaction_smiles) ScoreResult
+        +evaluate_processed(Reaction reaction) ScoreResult
         +score(str reaction_smiles) float
+        +score_processed(Reaction reaction) float
     }
 
     class DBManager {
@@ -120,6 +125,14 @@ classDiagram
 
     class ScoringConfig {
         <<Enum>>
+    }
+
+    class ScoreResult {
+        <<Dataclass / frozen>>
+        +float with_functional_groups
+        +float without_functional_groups
+        +uniform(float value) ScoreResult
+        +select(bool check_functional_groups) float
     }
 
     %% ---- Processing ----
@@ -278,6 +291,7 @@ classDiagram
         <<Dataclass / frozen>>
         +int idx
         +str name
+        +str ui_name
         +str smarts
         +FunctionalGroupClass fg_class
         +Chem.Mol pattern
@@ -358,4 +372,94 @@ classDiagram
         -_compute_signature(ReactionTransform transform, ReactionCenter rc) np.ndarray
         -_compute_mol_signature(Molecule mol, frozenset[int] skip_indices, np.ndarray fg_signature) np.ndarray
         +find_for_batch_and_annotate(Sequence[Reaction] reactions, Sequence[str] patents) Sequence[Reaction]
+    }
+
+    %% ============================================================
+    %% Parallel scoring
+    %% ============================================================
+
+    ListSink ..|> ResultSink
+    CsvSink ..|> ResultSink
+
+    MapperCrashedError --|> ParallelError
+    ScorerCrashedError --|> ParallelError
+    CheckpointCorruptedError --|> ParallelError
+
+    class ParallelConfig {
+        <<Dataclass / frozen>>
+        +int | None n_workers
+        +int | None n_mappers
+        +int | None mapper_threads
+        +int batch_size
+        +int map_queue_size
+        +int score_queue_size
+        +int result_queue_size
+        +int max_center_type
+        +bool find_exact_match
+        +bool progress
+        +int checkpoint_interval
+        +int | None maxtasksperchild
+        +int mapper_internal_batch_size
+        +bool use_fake_mapper
+        +dict[str, str] worker_extra_env
+        +resolved() ParallelConfig
+    }
+
+    class MapTask {
+        <<Dataclass / frozen>>
+        +int batch_id
+        +tuple[tuple[int, str], ...] items
+    }
+
+    class ScoreTask {
+        <<Dataclass / frozen>>
+        +int batch_id
+        +tuple[tuple[int, str, str | None], ...] items
+    }
+
+    class Result {
+        <<Dataclass / frozen>>
+        +int batch_id
+        +tuple[tuple[int, str, float, float], ...] items
+    }
+
+    class ResultSink {
+        <<Protocol>>
+        +write(Iterable[tuple[int, str, float, float]] items)
+        +close()
+    }
+
+    class ListSink {
+        -list[tuple[int, str, float, float]] items
+        +write(Iterable[tuple[int, str, float, float]] items)
+        +close()
+        +items() list[tuple[int, str, float, float]]
+    }
+
+    class CsvSink {
+        +write(Iterable[tuple[int, str, float, float]] items)
+        +close()
+    }
+
+    class CheckpointState {
+        <<Dataclass / frozen>>
+        +int last_contiguous_idx
+        +int completed_count
+        +frozenset[int] completed_above
+    }
+
+    class ParallelError {
+        <<Exception>>
+    }
+
+    class MapperCrashedError {
+        <<Exception>>
+    }
+
+    class ScorerCrashedError {
+        <<Exception>>
+    }
+
+    class CheckpointCorruptedError {
+        <<Exception>>
     }

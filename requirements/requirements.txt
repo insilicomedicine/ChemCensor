@@ -1,6 +1,8 @@
 frozendict==2.4.6
+huggingface-hub>=0.34.0,<1.0
 numpy==1.26.4
 rdkit>=2025.3.5,<2026.0.0
 transformers==4.57.6
 rxnmapper==0.4.2
+setuptools<81
 tqdm>=4.67.1

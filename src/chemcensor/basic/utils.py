@@ -69,6 +69,32 @@ def drop_atom_maps(mol: Chem.Mol) -> Chem.Mol:
     return mol
 
 
+# RDKit's SMILES writer re-runs stereo perception and drops chiral tags from atoms
+# it no longer recognizes as stereocentres. That verdict is wrong for reaction
+# center fragments: truncating the environment can turn chemically distinct
+# substituents into identical ones (at RC1 both a phenyl and an ethyl shrink to a
+# single atom), so a tag defined by the parent molecule would be silently lost.
+# The parent is parsed as a whole molecule, where the same check already ran and
+# where it is chemically meaningful.
+_STEREO_PRESERVING_PARAMS = Chem.SmilesWriteParams()
+_STEREO_PRESERVING_PARAMS.cleanStereo = False
+
+
+def mol_to_smiles_keeping_stereo(mol: Chem.Mol) -> str:
+    """Write SMILES without re-running RDKit's stereo cleanup.
+
+    Equivalent to ``Chem.MolToSmiles(mol)`` in every respect except that chiral
+    tags already present on *mol* are always written out, even when the molecule
+    no longer looks like it carries a stereocentre.
+
+    :param mol: RDKit molecule.
+    :type mol: Chem.Mol
+    :return: SMILES string.
+    :rtype: str
+    """
+    return Chem.MolToSmiles(mol, _STEREO_PRESERVING_PARAMS)
+
+
 def canonicalize_smiles(smiles: str) -> str:
     """Canonicalize a (possibly multi-component) SMILES string.
 
@@ -87,7 +113,7 @@ def canonicalize_smiles(smiles: str) -> str:
     mol = Chem.MolFromSmarts(smiles)
     if mol is None:
         raise ValueError(f"Failed to parse SMILES as SMARTS: {smiles!r}")
-    return Chem.MolToSmiles(mol)
+    return mol_to_smiles_keeping_stereo(mol)
 
 
 def detect_product_atom_change(T, p_atom_idx) -> AtomEditType:
@@ -157,13 +183,25 @@ def neighbor_indices(atom, atom_map=None):
 
 def atoms_differ_in_properties(atom_1, atom_2):
     """
-    Check if two atoms differ in properties.
+    Check if two atoms differ in any of the per-atom properties tracked by
+    edit detection.
+
+    The comparison is intended to catch atom-level changes that are not already
+    visible from the atom's neighbor set. It reports a difference when any of the
+    following differs between the two atoms:
+
+    * atomic number;
+    * number of radical electrons;
+    * formal charge;
+    * total number of (implicit and explicit) hydrogens;
+    * aromaticity flag.
+
 
     :param atom_1: First atom;
     :type atom_1: Chem.Atom;
     :param atom_2: Second atom;
     :type atom_2: Chem.Atom;
-    :return: True if atoms differ in properties, False otherwise;
+    :return: True if atoms differ in any tracked property, False otherwise;
     :rtype: bool;
     """
     if atom_1.GetAtomicNum() != atom_2.GetAtomicNum():
@@ -173,6 +211,8 @@ def atoms_differ_in_properties(atom_1, atom_2):
     elif atom_1.GetFormalCharge() != atom_2.GetFormalCharge():
         return True
     elif atom_1.GetTotalNumHs() != atom_2.GetTotalNumHs():
+        return True
+    elif atom_1.GetIsAromatic() != atom_2.GetIsAromatic():
         return True
     return False
 

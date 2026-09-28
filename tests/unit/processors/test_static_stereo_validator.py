@@ -222,6 +222,30 @@ def test_inconsistent_static_alkene_stereo_near_the_rc_raises(
         ReactionProcessor().process(reaction)
 
 
+REACTION_SMILES_WITH_AROMATIZATION_NEAR_RC: tuple[str, ...] = (
+    r"Cc1ccc(S(=O)(CC(N/C([C@H](Nc2c(C3CCOCC3)cn(C)n2)C)=N\O)=O)=O)cc1>>"
+    r"Cc4ccc(S(=O)(Cc5onc([C@H](Nc6c(C7CCOCC7)cn(C)n6)C)n5)=O)cc4",
+    r"C[C@H](/C(N)=N/O)Nc1c(C2CCOCC2)cn(C)n1.Cc3ccc(S(=O)(CC(O)=O)=O)cc3>>"
+    r"Cc4ccc(S(=O)(Cc5onc([C@H](Nc6c(C7CCOCC7)cn(C)n6)C)n5)=O)cc4",
+    r"Cc1cc(COc(cnn2C(C3CC3)=O)c(C4CCOCC4)c2=O)c(N/C(N)=N/O)cc1."
+    r"O=C(c(cn5)c6n5cccc6)O>>"
+    r"Cc7cc(COc(cnn8C(C9CC9)=O)c(C%10CCOCC%10)c8=O)c(Nc%11nc(c(cn%12)"
+    r"c%13n%12cccc%13)on%11)cc7",
+)
+
+
+@pytest.mark.parametrize(
+    "reaction_smiles",
+    REACTION_SMILES_WITH_AROMATIZATION_NEAR_RC,
+)
+def test_double_bond_stereo_lost_to_aromatization_passes(
+    reaction_smiles: str,
+):
+    reaction = Reaction(reaction_smiles=reaction_smiles)
+    processed = ReactionProcessor().process(reaction)
+    assert processed.dummy is False
+
+
 REACTION_SMILES_WITH_INCONSISTENT_STATIC_CENTERS: tuple[str, ...] = (
     "C=Cc1nc2ccccc2n1-c1nnc(C2CC2)[nH]1.CN[C@@H](C)C(=O)O>>"
     "C[C@H](C(=O)O)N(C)CCc1nc2ccccc2n1-c1nnc(C2CC2)[nH]1",

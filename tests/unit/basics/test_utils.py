@@ -52,6 +52,44 @@ def test_atoms_do_not_differ():
     assert atoms_differ_in_properties(atom1, atom2) is False
 
 
+def test_atoms_differ_when_atom_becomes_aromatic():
+    """Test atoms_differ_in_properties when an atom gains aromaticity.
+
+    Same atomic number, charge, radical count, and H count, but the atom
+    goes from a non-aromatic double bond to being part of an aromatic ring
+    (e.g. an oxime carbon that cyclizes into an isoxazole/oxadiazole).
+    """
+    mol1 = Chem.MolFromSmiles("CC(C)=N")  # non-aromatic imine carbon
+    mol2 = Chem.MolFromSmiles("Cc1ccno1")  # same carbon, now aromatic
+    atom1 = mol1.GetAtomWithIdx(1)
+    atom2 = mol2.GetAtomWithIdx(1)
+    assert atom1.GetIsAromatic() is False
+    assert atom2.GetIsAromatic() is True
+    assert atoms_differ_in_properties(atom1, atom2) is True
+
+
+def test_atoms_differ_when_atom_loses_aromaticity():
+    """Test atoms_differ_in_properties when an atom loses aromaticity
+    (dearomatization), the reverse direction of gaining aromaticity."""
+    mol1 = Chem.MolFromSmiles("Cc1ccno1")
+    mol2 = Chem.MolFromSmiles("CC(C)=N")
+    atom1 = mol1.GetAtomWithIdx(1)
+    atom2 = mol2.GetAtomWithIdx(1)
+    assert atom1.GetIsAromatic() is True
+    assert atom2.GetIsAromatic() is False
+    assert atoms_differ_in_properties(atom1, atom2) is True
+
+
+def test_atoms_do_not_differ_when_both_aromatic():
+    """Test atoms_differ_in_properties does not false-positive when both
+    atoms are aromatic and otherwise identical."""
+    mol1 = Chem.MolFromSmiles("c1ccccc1")
+    mol2 = Chem.MolFromSmiles("c1ccccc1")
+    atom1 = mol1.GetAtomWithIdx(0)
+    atom2 = mol2.GetAtomWithIdx(0)
+    assert atoms_differ_in_properties(atom1, atom2) is False
+
+
 def test_return_index_for_atom_map_found():
     """Test return_index_for_atom_map when atom with map number is found."""
     mol = Chem.MolFromSmiles("[CH3:1][CH2:2][OH:3]")
@@ -135,6 +173,73 @@ def test_detect_fragment_detach():
     result = detect_product_atom_change(transform, 0)
     # This should detect some change (either FRAGMENT_DETACH or other)
     assert result != AtomEditType.NONE
+
+
+def test_detect_property_change_for_aromatization_without_neighbor_change():
+    """Test detect_product_atom_change detects aromatization as a
+    PROPERTY_CHANGE when the atom keeps the same mapped neighbors, charge,
+    radical count, and H count.
+
+    Minimal analogue of an amidoxime + carboxylic acid condensation into a
+    1,2,4-oxadiazole: the oxime carbon and nitrogen keep the same mapped
+    neighbors on both sides of the reaction, but their shared bond turns
+    from a stereo-defined double bond into an aromatic ring bond.
+    """
+    from chemcensor.basic.reaction_transform import ReactionTransform
+    from chemcensor.basic.edits import AtomEditType
+    from chemcensor.basic.utils import detect_product_atom_change
+
+    reaction_smiles = (
+        r"[CH3:1]/[C:2]([NH2:3])=[N:4]/[OH:5].[CH3:6][C:7](=[O:8])[OH:9]"
+        r">>[CH3:1][c:2]1[n:4][o:5][c:7]([CH3:6])[n:3]1"
+    )
+    transform = ReactionTransform.from_reaction_smiles(reaction_smiles)
+
+    # Locate the product atoms mapped to the oxime carbon (:2) and the oxime
+    # nitrogen (:4); both must become aromatic without any neighbor/H/charge
+    # change relative to the reactant.
+    p_map = transform.product.atom_map
+    amn_to_idx = {amn: idx for idx, amn in p_map.items()}
+    oxime_carbon_idx = amn_to_idx[2]
+    oxime_nitrogen_idx = amn_to_idx[4]
+
+    assert (
+        detect_product_atom_change(transform, oxime_carbon_idx)
+        == AtomEditType.PROPERTY_CHANGE
+    )
+    assert (
+        detect_product_atom_change(transform, oxime_nitrogen_idx)
+        == AtomEditType.PROPERTY_CHANGE
+    )
+    assert oxime_carbon_idx in transform.p_reacting_atoms
+    assert oxime_nitrogen_idx in transform.p_reacting_atoms
+
+
+def test_unchanged_aromatic_ring_atoms_stay_non_reacting():
+    """Regression: atoms of a remote aromatic ring whose aromaticity does not
+    change must not be dragged into the reaction center by the new aromaticity
+    check.
+
+    A benzylic bromide -> alcohol substitution leaves the benzene ring
+    untouched, so none of its aromatic carbons should be reported as reacting.
+    """
+    from chemcensor.basic.reaction_transform import ReactionTransform
+    from chemcensor.basic.edits import AtomEditType
+    from chemcensor.basic.utils import detect_product_atom_change
+
+    reaction_smiles = (
+        "[cH:1]1[cH:2][cH:3][cH:4][cH:5][c:6]1[CH2:7][Br:8]"
+        ">>[cH:1]1[cH:2][cH:3][cH:4][cH:5][c:6]1[CH2:7][OH:8]"
+    )
+    transform = ReactionTransform.from_reaction_smiles(reaction_smiles)
+
+    p_map = transform.product.atom_map
+    amn_to_idx = {amn: idx for idx, amn in p_map.items()}
+    aromatic_ring_indices = [amn_to_idx[amn] for amn in range(1, 7)]
+
+    for p_idx in aromatic_ring_indices:
+        assert detect_product_atom_change(transform, p_idx) == AtomEditType.NONE
+        assert p_idx not in transform.p_reacting_atoms
 
 
 def test_neighbor_indices_with_tuple_atom_map():

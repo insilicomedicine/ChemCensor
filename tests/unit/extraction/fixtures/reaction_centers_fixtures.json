@@ -41,7 +41,7 @@
     "id": 5,
     "mapped_reaction_smiles": "[CH3:1][C:2]([CH3:3])([CH3:4])[O:5][C:6](=[O:7])[NH:8][C@@H:9]1[CH2:10][CH2:11][CH2:12][CH:13]1[N:14]=[N+]=[N-]>>[CH3:1][C:2]([CH3:3])([CH3:4])[O:5][C:6](=[O:7])[NH:8][C@@H:9]1[CH2:10][CH2:11][CH2:12][CH:13]1[NH2:14]",
     "reaction_centers": {
-      "1": "CN=N=N>>CN"
+      "1": "CN=[N+]=[N-]>>CN"
     },
     "number_of_reaction_centers": 1
   },
@@ -49,8 +49,8 @@
     "id": 6,
     "mapped_reaction_smiles": "[CH3:1][C:2]([CH3:3])([CH3:4])[O:5][C:6](=[O:7])[NH:8][C@@H:9]1[CH2:10][CH2:11][CH2:12][CH:13]1OS(C)(=O)=O.[N-:14]=[N+:15]=[N-:16]>>[CH3:1][C:2]([CH3:3])([CH3:4])[O:5][C:6](=[O:7])[NH:8][C@@H:9]1[CH2:10][CH2:11][CH2:12][CH:13]1[N:14]=[N+:15]=[N-:16]",
     "reaction_centers": {
-      "1": "CC(C)OS(C)(=O)=O.N=N=N>>CC(C)N=N=N",
-      "2": "CS(=O)(=O)OC1CCC[C@H]1N.N=N=N>>N[C@@H]1CCCC1N=N=N"
+      "1": "CC(C)OS(C)(=O)=O.[N-]=[N+]=[N-]>>CC(C)N=[N+]=[N-]",
+      "2": "CS(=O)(=O)OC1CCC[C@H]1N.[N-]=[N+]=[N-]>>N[C@@H]1CCCC1N=[N+]=[N-]"
     },
     "number_of_reaction_centers": 2
   },
@@ -78,9 +78,9 @@
     "id": 9,
     "mapped_reaction_smiles": "[CH3:1][O:2][C:3](=[O:4])[CH:5]([CH3:6])[CH2:7][c:8]1[cH:9][nH:10][c:12]2[n:13][cH:14][cH:15][n:16][c:17]12.[Na+:11]>>[CH3:1][O:2][C:3](=[O:4])[CH:5]([CH3:6])[CH2:7][c:8]1[cH:9][n:10]([Na:11])[c:12]2[n:13][cH:14][cH:15][n:16][c:17]12",
     "reaction_centers": {
-      "1": "[NaH].c[nH]c>>c[n](c)[Na]",
-      "2": "[NaH].c1cnc2[nH]ccc2n1>>[Na][n]1ccc2nccnc21",
-      "4": "Cc1c[nH]c2nccnc12.[NaH]>>Cc1c[n]([Na])c2nccnc12"
+      "1": "[Na+].c[nH]c>>c[n](c)[Na]",
+      "2": "[Na+].c1cnc2[nH]ccc2n1>>[Na][n]1ccc2nccnc21",
+      "4": "Cc1c[nH]c2nccnc12.[Na+]>>Cc1c[n]([Na])c2nccnc12"
     },
     "number_of_reaction_centers": 3
   },
@@ -99,10 +99,10 @@
     "id": 11,
     "mapped_reaction_smiles": "[CH3:1][CH2:2][O:3][C:4](=[O:5])[CH2:6][P:8](=[O:9])([O:10][CH3:11])[O:12][CH3:13].[Na+:7]>>[CH3:1][CH2:2][O:3][C:4](=[O:5])[CH:6]([Na:7])[P:8](=[O:9])([O:10][CH3:11])[O:12][CH3:13]",
     "reaction_centers": {
-      "1": "O=CCP=O.[NaH]>>O=C[CH]([Na])P=O",
-      "2": "OC(=O)CP(O)(O)=O.[NaH]>>OC(=O)[CH]([Na])P(O)(O)=O",
-      "3": "COC(=O)CP(=O)(OC)OC.[NaH]>>COC(=O)[CH]([Na])P(=O)(OC)OC",
-      "4": "CCOC(=O)CP(=O)(OC)OC.[NaH]>>CCOC(=O)[CH]([Na])P(=O)(OC)OC"
+      "1": "O=CCP=O.[Na+]>>O=C[CH]([Na])P=O",
+      "2": "OC(=O)CP(O)(O)=O.[Na+]>>OC(=O)[CH]([Na])P(O)(O)=O",
+      "3": "COC(=O)CP(=O)(OC)OC.[Na+]>>COC(=O)[CH]([Na])P(=O)(OC)OC",
+      "4": "CCOC(=O)CP(=O)(OC)OC.[Na+]>>CCOC(=O)[CH]([Na])P(=O)(OC)OC"
     },
     "number_of_reaction_centers": 4
   },
@@ -120,8 +120,8 @@
     "id": 13,
     "mapped_reaction_smiles": "N#[N+][c:2]1[cH:3][cH:4][n:5][c:6]2[nH:7][n:8][cH:9][c:10]12.[Br:1][Cu][Br]>>[Br:1][c:2]1[cH:3][cH:4][n:5][c:6]2[nH:7][n:8][cH:9][c:10]12",
     "reaction_centers": {
-      "1": "[Br][Cu][Br].cc(c)N#N>>cc(c)Br",
-      "2": "N#Nc1ccnc2nncc12.[Br][Cu][Br]>>Brc1ccnc2nncc12"
+      "1": "[Br][Cu][Br].cc(c)[N+]#N>>cc(c)Br",
+      "2": "N#[N+]c1ccnc2nncc12.[Br][Cu][Br]>>Brc1ccnc2nncc12"
     },
     "number_of_reaction_centers": 2
   },
@@ -140,9 +140,9 @@
     "id": 15,
     "mapped_reaction_smiles": "[CH3:1][O:2][CH2:3][CH2:4][c:5]1[cH:6][cH:7][cH:8][cH:10][n:11]1.O=[N+:9]([O-])O>>[CH3:1][O:2][CH2:3][CH2:4][c:5]1[cH:6][cH:7][c:8]([NH2:9])[cH:10][n:11]1",
     "reaction_centers": {
-      "1": "ON(O)=O.ccc>>cc(c)N",
-      "2": "ON(O)=O.c1ccncc1>>Nc1cccnc1",
-      "4": "Cc1ccccn1.ON(O)=O>>Cc1ccc(N)cn1"
+      "1": "O[N+](=O)[O-].ccc>>cc(c)N",
+      "2": "O[N+](=O)[O-].c1ccncc1>>Nc1cccnc1",
+      "4": "Cc1ccccn1.O[N+](=O)[O-]>>Cc1ccc(N)cn1"
     },
     "number_of_reaction_centers": 3
   },
@@ -150,9 +150,9 @@
     "id": 16,
     "mapped_reaction_smiles": "[CH3:1][c:2]1[n:3][c:4]([N+]#N)[n:6][cH:7][c:8]1[Br:9].[Cl:5][Cu][Cl]>>[CH3:1][c:2]1[n:3][c:4]([Cl:5])[n:6][cH:7][c:8]1[Br:9]",
     "reaction_centers": {
-      "1": "N#Nc(n)n.[Cl][Cu][Cl]>>nc(n)Cl",
-      "2": "N#Nc1ncccn1.[Cl][Cu][Cl]>>Clc1ncccn1",
-      "4": "Cc1nc(N#N)ncc1Br.[Cl][Cu][Cl]>>Cc1nc(Cl)ncc1Br"
+      "1": "N#[N+]c(n)n.[Cl][Cu][Cl]>>nc(n)Cl",
+      "2": "N#[N+]c1ncccn1.[Cl][Cu][Cl]>>Clc1ncccn1",
+      "4": "Cc1nc([N+]#N)ncc1Br.[Cl][Cu][Cl]>>Cc1nc(Cl)ncc1Br"
     },
     "number_of_reaction_centers": 3
   },
@@ -193,8 +193,8 @@
     "id": 20,
     "mapped_reaction_smiles": "[O:18]=[C:17]1[CH2:2][CH2:3][CH2:4][N:5]([C:6](=[O:7])[O:8][CH2:9][c:10]2[cH:11][cH:12][cH:13][cH:14][cH:15]2)[CH2:16]1.[Li+:1]>>[Li:1][CH:2]1[CH2:3][CH2:4][N:5]([C:6](=[O:7])[O:8][CH2:9][c:10]2[cH:11][cH:12][cH:13][cH:14][cH:15]2)[CH2:16][C:17]1=[O:18]",
     "reaction_centers": {
-      "1": "CCC=O.[LiH]>>[Li][CH](C)C=O",
-      "2": "O=C1CCCNC1.[LiH]>>[Li][CH]1CCNCC1=O"
+      "1": "CCC=O.[Li+]>>[Li][CH](C)C=O",
+      "2": "O=C1CCCNC1.[Li+]>>[Li][CH]1CCNCC1=O"
     },
     "number_of_reaction_centers": 2
   },
@@ -253,7 +253,7 @@
     "reaction_centers": {
       "1": "c[O][Na].c[nH]n.cc(c)Br>>cOc(c)c.c[n](n)[Na]",
       "2": "Brc1ccccc1.[Na][O]c1cn[nH]c1>>[Na][n]1cc(Oc2ccccc2)cn1",
-      "4": "ON(=O)c1cccc(Br)c1.[Na][O]c1cn[nH]c1>>ON(=O)c1cccc(Oc2cn[n]([Na])c2)c1"
+      "4": "O=[N+]([O-])c1cccc(Br)c1.[Na][O]c1cn[nH]c1>>O=[N+]([O-])c1cccc(Oc2cn[n]([Na])c2)c1"
     },
     "number_of_reaction_centers": 3
   },

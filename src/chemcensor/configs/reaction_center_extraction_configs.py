@@ -21,8 +21,13 @@ class ExtractionConfig:
     :type include_fused: bool
     :param include_substituents: Whether to include aryl substituents.
     :type include_substituents: bool
-    :param include_chiral: Whether to include chiral centers.
+    :param include_chiral: Whether to expand the fragment around chiral centers,
+        pulling in their rings and neighbors.
     :type include_chiral: bool
+    :param include_stereo_tags: Whether to carry stereo tags over to the extracted
+        fragment. Independent of ``include_chiral``: a level can keep the tags of
+        the atoms it already covers without growing the fragment.
+    :type include_stereo_tags: bool
     """
 
     center_type: ReactionCenterType
@@ -31,6 +36,7 @@ class ExtractionConfig:
     include_fused: bool = False
     include_substituents: bool = False
     include_chiral: bool = False
+    include_stereo_tags: bool = True
 
 
 BASE_CONFIG = ExtractionConfig(center_type=ReactionCenterType.RC1)

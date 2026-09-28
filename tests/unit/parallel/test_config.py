@@ -85,6 +85,43 @@ def test_parallel_config_resolved_preserves_use_fake_mapper() -> None:
     assert ParallelConfig(use_fake_mapper=True).resolved().use_fake_mapper is True
 
 
+def test_parallel_config_resolved_preserves_use_cpu() -> None:
+    assert ParallelConfig().resolved().use_cpu is False
+    assert ParallelConfig(use_cpu=True).resolved().use_cpu is True
+
+
+def test_parallel_config_resolves_in_process_batch_threshold() -> None:
+    assert ParallelConfig().resolved().in_process_batch_threshold == 16
+    assert (
+        ParallelConfig(in_process_batch_threshold=7)
+        .resolved()
+        .in_process_batch_threshold
+        == 7
+    )
+    assert (
+        ParallelConfig(in_process_batch_threshold=-1)
+        .resolved()
+        .in_process_batch_threshold
+        == 0
+    )
+
+
+def test_parallel_config_resolved_preserves_validator_flags() -> None:
+    defaults = ParallelConfig().resolved()
+    assert defaults.validate_input is True
+    assert defaults.check_skeleton_conservation is True
+    assert defaults.check_static_stereo is True
+
+    disabled = ParallelConfig(
+        validate_input=False,
+        check_skeleton_conservation=False,
+        check_static_stereo=False,
+    ).resolved()
+    assert disabled.validate_input is False
+    assert disabled.check_skeleton_conservation is False
+    assert disabled.check_static_stereo is False
+
+
 def test_parallel_config_resolved_autoscales_none(monkeypatch) -> None:
     monkeypatch.setattr("os.cpu_count", lambda: 16)
     cfg = ParallelConfig()

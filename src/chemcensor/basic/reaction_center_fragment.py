@@ -4,6 +4,7 @@ from functools import cached_property
 from rdkit import Chem
 
 from .utils import drop_atom_maps
+from .utils import mol_to_smiles_keeping_stereo
 
 
 @dataclass(frozen=True)
@@ -22,7 +23,7 @@ class ReactionCenterFragment:
         :return: Atom-mapped SMILES representation of the fragment.
         :rtype: str
         """
-        return Chem.MolToSmiles(self.fr_mol, ignoreAtomMapNumbers=False)
+        return mol_to_smiles_keeping_stereo(self.fr_mol)
 
     @cached_property
     def smiles(self) -> str:
@@ -34,7 +35,7 @@ class ReactionCenterFragment:
         """
         # drop atom maps from the fragment
         fr_mol = drop_atom_maps(self.fr_mol)
-        smiles = Chem.MolToSmiles(fr_mol)
+        smiles = mol_to_smiles_keeping_stereo(fr_mol)
         if not smiles:
             raise ValueError("Failed to convert reaction center fragment to SMILES")
         return smiles
@@ -59,7 +60,7 @@ class ReactionCenterFragment:
         frags = Chem.GetMolFrags(self.fr_mol, asMols=True, sanitizeFrags=False)
         result: list[tuple[str, frozenset[int]]] = []
         for frag in frags:
-            unmapped = Chem.MolToSmiles(drop_atom_maps(frag))
+            unmapped = mol_to_smiles_keeping_stereo(drop_atom_maps(frag))
             if not unmapped:
                 continue
             maps = frozenset(

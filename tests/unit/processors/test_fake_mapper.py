@@ -67,6 +67,32 @@ def test_process_roundtrip_from_precomputed_mapped_rxn(fake_mapper):
     assert out.mapped_reaction_smiles == mapped_rxn
 
 
+def test_prepare_fake_mapper_meta_drops_reactant_maps_absent_from_product():
+    """Leaving-group maps only on the reactant must not enter FakeMapper meta."""
+    mapped_with_leaving_group = (
+        "[CH3:1][CH2:2][O:3][C:4](=[O:5])[CH:6]([NH2:7])[CH2:8][CH2:9]"
+        "[NH:10][C:12](=[O:11])[O:13][CH2:14][CH:15]1[c:20]2[c:19]([cH:18]"
+        "[cH:17][cH:16][cH:21]2)-[c:23]2[c:22]1[cH:27][cH:26][cH:25][cH:24]2>>"
+        "[CH3:1][CH2:2][O:3][C:4](=[O:5])[CH:6]([NH2:7])[CH2:8][CH2:9][NH2:10]"
+    )
+    mapped_without_leaving_group = (
+        "O=C(OCC1c2ccccc2-c2ccccc21)[NH:10][CH2:9][CH2:8][CH:6]"
+        "([C:4]([O:3][CH2:2][CH3:1])=[O:5])[NH2:7]>>"
+        "[CH3:1][CH2:2][O:3][C:4](=[O:5])[CH:6]([NH2:7])[CH2:8][CH2:9][NH2:10]"
+    )
+    meta_with = prepare_fake_mapper_meta_from_mapped_rxn(mapped_with_leaving_group)
+    meta_without = prepare_fake_mapper_meta_from_mapped_rxn(
+        mapped_without_leaving_group
+    )
+    reactant_maps_with = meta_with[ATOM_MAPS_META_KEY]["reactants"][0]
+    reactant_maps_without = meta_without[ATOM_MAPS_META_KEY]["reactants"][0]
+    product_maps = set(meta_with[ATOM_MAPS_META_KEY]["product"].values())
+
+    assert set(reactant_maps_with.values()) == product_maps
+    assert set(reactant_maps_with.values()) == set(reactant_maps_without.values())
+    assert max(reactant_maps_with.values()) == 10
+
+
 def test_process_accepts_string_keys_for_atom_indices(fake_mapper):
     reaction = Reaction(
         reaction_smiles="CO>>CO",

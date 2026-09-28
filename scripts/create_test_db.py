@@ -9,12 +9,12 @@ from rdkit import Chem
 
 from chemcensor.basic import Reaction
 from chemcensor.basic import ReactionCenterType
+from chemcensor.configs.chemcensor_config import ChemCensorConfig
 from chemcensor.db.manager import DBManager
 from chemcensor.extraction import ReactionCenterExtractor
 from chemcensor.processing.base import Processor
 from chemcensor.processing.mapper import Mapper
 from chemcensor.processing.orphan_remover import OrphanRemover
-from chemcensor.processing.reaction_processor import DEFAULT_PROCESSORS
 from chemcensor.processing.reaction_processor import ReactionProcessor
 from chemcensor.processing.sear_annotator import SeArAnnotator
 from chemcensor.processing.sis_annotator import SisAnnotator
@@ -128,7 +128,7 @@ def main() -> None:
     OUTPUT_DB_DIR.mkdir(parents=True, exist_ok=True)
 
     db = DBManager()
-    processor = ReactionProcessor(processors=DEFAULT_PROCESSORS)
+    processor = ChemCensorConfig().build_processor()
 
     for group in FIXTURE_GROUPS:
         max_center_type, *fixture_ids = group

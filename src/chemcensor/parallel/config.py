@@ -19,6 +19,9 @@ _DEFAULT_MAPPER_THREADS = 1
 # and progress reporting, but Python GC and the orchestrator itself
 # need breathing room).
 _MAIN_PROCESS_RESERVE = 1
+# Route-sized batches avoid process startup and reuse one guarded in-process
+# ChemCensor. Larger batches retain the multiprocessing pipeline.
+_DEFAULT_IN_PROCESS_BATCH_THRESHOLD = 16
 
 
 @dataclass(frozen=True)
@@ -79,9 +82,37 @@ class ParallelConfig:
         instead of running ``rxnmapper``. No GPU is used and the
         reaction-SMILES length check is disabled.
     :type use_fake_mapper: bool
+    :param use_cpu: When ``True``, mapper subprocesses inherit an empty
+        ``CUDA_VISIBLE_DEVICES`` so ``rxnmapper`` runs on CPU. Use this to
+        avoid several mapper processes each loading the model onto the same
+        GPU (VRAM contention silently turns into ``failed_reaction_scoring``).
+        Ignored on the FakeMapper path, which never uses the GPU.
+    :type use_cpu: bool
+    :param validate_input: When ``True`` (default), run the preliminary
+        SMILES :class:`~chemcensor.processing.validator.Validator` in the
+        mapper (rxnmapper path) and in scorer / composer workers.
+    :type validate_input: bool
+    :param check_skeleton_conservation: When ``True`` (default), run
+        :class:`~chemcensor.processing.skeleton_conservation_validator.SkeletonConservationValidator`
+        in scorer / composer workers.
+    :type check_skeleton_conservation: bool
+    :param check_static_stereo: When ``True`` (default), run
+        :class:`~chemcensor.processing.static_stereo_validator.StaticStereoValidator`
+        in scorer / composer workers.
+    :type check_static_stereo: bool
     :param worker_extra_env: Optional environment overrides applied in
-        every scorer process before any heavy import.
+        every scorer process before any heavy import. A non-empty mapping
+        forces ``score_batch`` onto the multiprocessing path even below the
+        in-process threshold.
     :type worker_extra_env: dict[str, str]
+    :param include_canonical_smiles: When ``True``, scorer results carry
+        a fifth field with the canonical reaction SMILES (or the raw
+        input on failure).
+    :type include_canonical_smiles: bool
+    :param in_process_batch_threshold: Maximum ``score_batch`` input size
+        handled by the reusable in-process scorer. ``0`` disables this path.
+        File scoring is never affected.
+    :type in_process_batch_threshold: int
     """
 
     n_workers: int | None = None
@@ -98,7 +129,13 @@ class ParallelConfig:
     maxtasksperchild: int | None = None
     mapper_internal_batch_size: int = 32
     use_fake_mapper: bool = False
+    use_cpu: bool = False
+    validate_input: bool = True
+    check_skeleton_conservation: bool = True
+    check_static_stereo: bool = True
     worker_extra_env: dict[str, str] = field(default_factory=dict)
+    include_canonical_smiles: bool = False
+    in_process_batch_threshold: int = _DEFAULT_IN_PROCESS_BATCH_THRESHOLD
 
     def resolved(self) -> "ParallelConfig":
         """Return a copy with auto-scaled ``n_workers`` / ``n_mappers`` /
@@ -129,7 +166,13 @@ class ParallelConfig:
             maxtasksperchild=self.maxtasksperchild,
             mapper_internal_batch_size=self.mapper_internal_batch_size,
             use_fake_mapper=self.use_fake_mapper,
+            use_cpu=self.use_cpu,
+            validate_input=self.validate_input,
+            check_skeleton_conservation=self.check_skeleton_conservation,
+            check_static_stereo=self.check_static_stereo,
             worker_extra_env=dict(self.worker_extra_env),
+            include_canonical_smiles=self.include_canonical_smiles,
+            in_process_batch_threshold=max(0, self.in_process_batch_threshold),
         )
 
 

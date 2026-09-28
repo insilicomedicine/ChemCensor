@@ -9,6 +9,7 @@ from ..configs.reaction_center_extraction_configs import ExtractionConfig
 from ..rules.expandable_functional_groups import (
     EXPANDABLE_FUNCTIONAL_GROUPS_COLLECTION,
 )
+from .errors.extraction_errors import ExtractionError
 from .errors.fragment_extractor_errors import MoleculeNotSetError
 from .utils import clean_hydrogens_from_smarts
 
@@ -34,6 +35,7 @@ class MolecularFragmentExtractor:
         self.include_fused = config.include_fused
         self.include_substituents = config.include_substituents
         self.include_chiral = config.include_chiral
+        self.include_stereo_tags = config.include_stereo_tags
 
         # Mutable state — reset before each extraction
         self._mol: Molecule | None = None
@@ -366,20 +368,23 @@ class MolecularFragmentExtractor:
                 smarts: str = atom.GetSmarts()
             else:
                 smarts = clean_hydrogens_from_smarts(
-                    atom.GetSmarts(), keep_stars=self.include_chiral
+                    atom.GetSmarts(), keep_stars=self.include_stereo_tags
                 )
-
-            new_idx: int = fragment.AddAtom(Chem.AtomFromSmarts(smarts))
+            # cover case when atom is valid as smiles but not as smarts
+            # for example, in reagent CCC[CH2][Sn]([CH2]CCC)([CH2]CCC)[O][Ts]
+            try:
+                new_idx: int = fragment.AddAtom(Chem.AtomFromSmarts(smarts))
+            except RuntimeError:
+                raise ExtractionError(f"Failed to add atom {smarts} to fragment")
             atom_mapping[idx] = new_idx
 
             new_atom = fragment.GetAtomWithIdx(new_idx)
             new_atom.SetIsAromatic(atom.GetIsAromatic())
-            # Ignore formal charges
-            new_atom.SetFormalCharge(0)
+            new_atom.SetFormalCharge(atom.GetFormalCharge())
             new_atom.SetAtomMapNum(atom.GetAtomMapNum())
             new_atom.SetChiralTag(
                 atom.GetChiralTag()
-                if self.include_chiral
+                if self.include_stereo_tags
                 else Chem.ChiralType.CHI_UNSPECIFIED
             )
 
@@ -400,4 +405,111 @@ class MolecularFragmentExtractor:
                 bond.GetBondType(),
             )
 
+        if self.include_stereo_tags:
+            self._drop_truncated_stereo_tags(fragment, atom_mapping)
+            self._drop_unperceived_context_stereo_tags(fragment, atom_mapping)
+
         return fragment.GetMol(), expanded_indices
+
+    def _drop_unperceived_context_stereo_tags(
+        self,
+        fragment: Chem.RWMol,
+        atom_mapping: dict[int, int],
+    ) -> None:
+        """Apply RDKit's stereo perception to context atoms, but not to core ones.
+
+        Core atoms bypass stereo perception: telling retention from inversion is
+        the whole point of recording stereochemistry on a reaction center, and at
+        RC1 their substituents are truncated so heavily that RDKit no longer
+        perceives them as stereocentres at all. Truncation can still clear a core
+        tag when the atom's degree drops (see ``_drop_truncated_stereo_tags``).
+
+        For the surrounding atoms that perception is the desired behaviour — a tag
+        that survives it describes the fragment, one that does not is noise which
+        would split otherwise identical centers.
+
+        :param fragment: Fragment under construction, modified in place.
+        :type fragment: Chem.RWMol
+        :param atom_mapping: Parent atom index → fragment atom index.
+        :type atom_mapping: dict[int, int]
+        """
+        tagged_context = [
+            fragment_idx
+            for parent_idx, fragment_idx in atom_mapping.items()
+            if parent_idx not in self._core_indices
+            and fragment.GetAtomWithIdx(fragment_idx).GetChiralTag()
+            != Chem.ChiralType.CHI_UNSPECIFIED
+        ]
+        if not tagged_context:
+            return
+
+        # No perception verdict means no grounds to drop anything, so the tags
+        # stay: an unreadable fragment must not silently lose stereochemistry.
+        perceived = self._perceived_stereo_atoms(fragment)
+        if perceived is None:
+            return
+
+        for fragment_idx in tagged_context:
+            if fragment_idx not in perceived:
+                fragment.GetAtomWithIdx(fragment_idx).SetChiralTag(
+                    Chem.ChiralType.CHI_UNSPECIFIED
+                )
+
+    @staticmethod
+    def _perceived_stereo_atoms(fragment: Chem.RWMol) -> set[int] | None:
+        """Return indices RDKit perceives as stereocentres in *fragment*.
+
+        Fragments are query molecules assembled atom by atom, so they carry
+        neither an implicit-valence cache nor ring information, both of which
+        perception needs.
+
+        :param fragment: Fragment to inspect; not modified.
+        :type fragment: Chem.RWMol
+        :return: Perceived stereocentre indices, or *None* if RDKit cannot
+            perceive stereochemistry for this fragment at all.
+        :rtype: set[int] | None
+        """
+        probe = Chem.RWMol(fragment)
+        try:
+            probe.UpdatePropertyCache(strict=False)
+            Chem.FastFindRings(probe)
+            return {
+                element.centeredOn
+                for element in Chem.FindPotentialStereo(probe)
+                if element.type == Chem.StereoType.Atom_Tetrahedral
+            }
+        except (RuntimeError, ValueError):
+            return None
+
+    def _drop_truncated_stereo_tags(
+        self,
+        fragment: Chem.RWMol,
+        atom_mapping: dict[int, int],
+    ) -> None:
+        """Clear stereo tags from atoms that lost a substituent during extraction.
+
+        A tetrahedral tag describes an arrangement of four substituents, so it
+        only carries meaning while all of them are still attached. Extraction can
+        drop one (a neighbour left outside the fragment, or a bond removed by
+        :meth:`_should_skip_bond`), which would leave behind a tag that denotes
+        nothing and can even be written out as an impossible atom such as
+        ``[C@H3]``.
+
+        Substituents that are merely *truncated* — a phenyl shortened to a single
+        aromatic atom, say — do not count as lost: the atom keeps its degree and
+        the tag still describes the original arrangement.
+
+        :param fragment: Fragment under construction, modified in place.
+        :type fragment: Chem.RWMol
+        :param atom_mapping: Parent atom index → fragment atom index.
+        :type atom_mapping: dict[int, int]
+        """
+        mol = self._safe_rdmol
+
+        for parent_idx, fragment_idx in atom_mapping.items():
+            fragment_atom = fragment.GetAtomWithIdx(fragment_idx)
+            if fragment_atom.GetChiralTag() == Chem.ChiralType.CHI_UNSPECIFIED:
+                continue
+
+            if fragment_atom.GetDegree() < mol.GetAtomWithIdx(parent_idx).GetDegree():
+                fragment_atom.SetChiralTag(Chem.ChiralType.CHI_UNSPECIFIED)

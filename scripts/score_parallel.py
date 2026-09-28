@@ -45,8 +45,9 @@ def parse_args() -> argparse.Namespace:
         "--db",
         dest="db_path",
         type=Path,
-        required=True,
-        help="Path to the SQLite reaction-centers database.",
+        default=None,
+        help="Path to the SQLite reaction-centers database. When omitted, "
+        "download and cache the current default database from Hugging Face.",
     )
     parser.add_argument(
         "--smiles-column",
@@ -60,6 +61,13 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Reuse precomputed atom maps from --smiles-column via FakeMapper "
         "instead of running rxnmapper (no GPU; disables the length check).",
+    )
+    parser.add_argument(
+        "--cpu",
+        action="store_true",
+        help="Run rxnmapper on CPU instead of GPU. Use this when several "
+        "mapper processes would otherwise contend for VRAM (silent mapping "
+        "failures become score -1).",
     )
     parser.add_argument(
         "--checkpoint",
@@ -145,6 +153,7 @@ def main() -> None:
         maxtasksperchild=args.maxtasksperchild,
         checkpoint_interval=args.checkpoint_interval,
         use_fake_mapper=args.fake_mapper,
+        use_cpu=args.cpu,
     )
     logger.info(
         "Starting parallel scoring: input=%s output=%s db=%s config=%s",

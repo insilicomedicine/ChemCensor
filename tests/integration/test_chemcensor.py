@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import numpy as np
@@ -11,6 +12,7 @@ from chemcensor.basic import Reaction
 from chemcensor.basic import ReactionCenterType
 from chemcensor.chemcensor import ChemCensor
 from chemcensor.chemcensor import ScoreResult
+from chemcensor.configs.chemcensor_config import ChemCensorConfig
 from chemcensor.configs.scoring_configs import ScoringConfig
 from chemcensor.db.manager import DBManager
 from chemcensor.errors import InvalidCenterTypeError
@@ -69,6 +71,33 @@ def db_path() -> Path:
     return RC_DB_PATH
 
 
+@pytest.mark.parametrize("readonly", [False, True], ids=["loaded", "readonly"])
+def test_scoring_can_use_database_from_worker_thread(
+    tmp_path: Path,
+    readonly: bool,
+) -> None:
+    reaction_smiles = "CCO>>CC=O"
+    source = DBManager()
+    source.add_reaction(reaction_smiles, document_id="doc-1")
+    db_path = tmp_path / "threaded.sqlite"
+    source.dump(db_path)
+
+    manager = DBManager.open_readonly(db_path) if readonly else DBManager.load(db_path)
+    censor = ChemCensor(
+        manager=manager,
+        processor=ReactionProcessor(processors=()),
+    )
+    reaction = Reaction(
+        reaction_smiles=reaction_smiles,
+        canonical_smiles=reaction_smiles,
+    )
+
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        result = executor.submit(censor.evaluate_processed, reaction).result(timeout=5)
+
+    assert result == ScoreResult.uniform(ScoringConfig.exact_match_scoring.value)
+
+
 # ---------------------------------------------------------------------------
 # Score when reaction centers ARE in DB (by FIXTURE_GROUPS)
 # ---------------------------------------------------------------------------
@@ -102,7 +131,7 @@ def test_score_when_centers_in_db(
 
     censor = ChemCensor(
         db_path=db_path,
-        max_center_type=max_center_type,
+        config=ChemCensorConfig(max_center_type=max_center_type),
     )
     score = censor.score(smiles)
 
@@ -215,9 +244,11 @@ def test_score_center_in_db_with_nonmatching_fg() -> None:
 
     with_fg_check = ChemCensor(
         manager=db,
-        max_center_type=1,
-        find_exact_match=False,
-        check_functional_groups=True,
+        config=ChemCensorConfig(
+            max_center_type=1,
+            find_exact_match=False,
+            check_functional_groups=True,
+        ),
     )
     assert (
         with_fg_check.score(modified_smiles)
@@ -226,9 +257,11 @@ def test_score_center_in_db_with_nonmatching_fg() -> None:
 
     without_fg_check = ChemCensor(
         manager=db,
-        max_center_type=1,
-        find_exact_match=False,
-        check_functional_groups=False,
+        config=ChemCensorConfig(
+            max_center_type=1,
+            find_exact_match=False,
+            check_functional_groups=False,
+        ),
     )
     assert without_fg_check.score(modified_smiles) == ScoringConfig.lc_1_scoring.value
 
@@ -291,12 +324,17 @@ def test_evaluate_distinguishes_fg_variants_in_single_pass() -> None:
         original_rc1.fg_signature,
     )
 
-    censor = ChemCensor(manager=db, max_center_type=1, find_exact_match=False)
+    censor = ChemCensor(
+        manager=db,
+        config=ChemCensorConfig(max_center_type=1, find_exact_match=False),
+    )
     result = censor.evaluate(FIXTURE_19_WITH_EXTRA_FG_RXN_SMILES)
 
     assert result == ScoreResult(
         with_functional_groups=ScoringConfig.default_reaction_scoring.value,
         without_functional_groups=ScoringConfig.lc_1_scoring.value,
+        # FG check ran and failed: expose the decisive center's FG total.
+        total_number_of_fgs=6,
     )
 
 
@@ -315,7 +353,8 @@ def test_evaluate_select_matches_score(
         "not-a-reaction",
     ]
     censor = ChemCensor(
-        db_path=db_path, check_functional_groups=check_functional_groups
+        db_path=db_path,
+        config=ChemCensorConfig(check_functional_groups=check_functional_groups),
     )
 
     for smiles in smiles_inputs:
@@ -338,7 +377,7 @@ def test_score_rc1_only_in_db_returns_lc_1(
     fixture = _get_fixture(fixture_id)
     censor = ChemCensor(
         db_path=db_path,
-        find_exact_match=False,
+        config=ChemCensorConfig(find_exact_match=False),
     )
     smiles = _strip_atom_maps(fixture["mapped_reaction_smiles"])
     score = censor.score(smiles)
@@ -375,7 +414,7 @@ def test_raises_on_invalid_center_type(
 ) -> None:
     """Invalid max_center_type raises InvalidCenterTypeError on init."""
     with pytest.raises(InvalidCenterTypeError, match=str(bad_value)):
-        ChemCensor(db_path=db_path, max_center_type=bad_value)
+        ChemCensor(db_path=db_path, config=ChemCensorConfig(max_center_type=bad_value))
 
 
 # ---------------------------------------------------------------------------
@@ -387,7 +426,7 @@ def test_score_returns_failed_when_processing_fails(
     db_path: Path,
 ) -> None:
     """Invalid reaction (e.g. empty) → failed_reaction_scoring."""
-    censor = ChemCensor(db_path=db_path, max_center_type=1)
+    censor = ChemCensor(db_path=db_path, config=ChemCensorConfig(max_center_type=1))
     assert censor.score(">>") == ScoringConfig.failed_reaction_scoring.value
 
 
@@ -395,8 +434,29 @@ def test_score_returns_failed_for_bad_smiles(
     db_path: Path,
 ) -> None:
     """Invalid SMILES → failed_reaction_scoring."""
-    censor = ChemCensor(db_path=db_path, max_center_type=1)
+    censor = ChemCensor(db_path=db_path, config=ChemCensorConfig(max_center_type=1))
     assert censor.score("not-a-reaction") == ScoringConfig.failed_reaction_scoring.value
+
+
+# A data-extraction artifact: an ethyl ether silently becomes a methyl ether
+# (``CCOC...`` -> ``COC...``) while a Boc group is removed. The C-O bond is
+# preserved, yet the alkyl chain loses a carbon with no leaving group or reagent
+# to account for it. The SkeletonConservationValidator rejects it, so scoring
+# falls back to failed_reaction_scoring.
+SKELETON_TRUNCATION_ARTIFACT_SMILES = (
+    "CCOCC1(Nc2nc(C)c(-c3nc(C)nc4sccc34)c([C@@H]3CCCN3C(=O)OC(C)(C)C)n2)CCCC1"
+    ">>"
+    "COCC1(Nc2nc(C)c(-c3nc(C)nc4sccc34)c([C@@H]3CCCN3)n2)CCCC1"
+)
+
+
+def test_score_returns_failed_for_skeleton_truncation_artifact(
+    db_path: Path,
+) -> None:
+    """Silent ethyl->methyl carbon-chain truncation → failed_reaction_scoring."""
+    censor = ChemCensor(db_path=db_path)
+    score = censor.score(SKELETON_TRUNCATION_ARTIFACT_SMILES)
+    assert score == ScoringConfig.failed_reaction_scoring.value
 
 
 # ---------------------------------------------------------------------------
@@ -759,7 +819,7 @@ def test_score_fg_identical_signatures_pass(
 ) -> None:
     """Centers in DB with identical FG signatures → all pass → max center score."""
     db = _build_manager(fixture_1_reaction)
-    censor = ChemCensor(manager=db, find_exact_match=False)
+    censor = ChemCensor(manager=db, config=ChemCensorConfig(find_exact_match=False))
     score = censor.score(fixture_1_reaction.reaction_smiles)
     max_ct = max(fixture_1_reaction.reaction_centers.keys())
     assert score == ScoringConfig[f"lc_{max_ct}_scoring"].value
@@ -772,7 +832,7 @@ def test_score_fg_ref_superset_passes(
     all_ones = np.ones(FG_SIGNATURE_LENGTH, dtype=np.uint8)
     overrides = {ct: all_ones for ct in fixture_1_reaction.reaction_centers}
     db = _build_manager(fixture_1_reaction, overrides)
-    censor = ChemCensor(manager=db, find_exact_match=False)
+    censor = ChemCensor(manager=db, config=ChemCensorConfig(find_exact_match=False))
     score = censor.score(fixture_1_reaction.reaction_smiles)
     max_ct = max(fixture_1_reaction.reaction_centers.keys())
     assert score == ScoringConfig[f"lc_{max_ct}_scoring"].value
@@ -786,7 +846,7 @@ def test_score_fg_mismatch_breaks_at_first_nonzero(
     zeros = np.zeros(FG_SIGNATURE_LENGTH, dtype=np.uint8)
     overrides = {ct: zeros for ct in fixture_1_reaction.reaction_centers}
     db = _build_manager(fixture_1_reaction, overrides)
-    censor = ChemCensor(manager=db, find_exact_match=False)
+    censor = ChemCensor(manager=db, config=ChemCensorConfig(find_exact_match=False))
     score = censor.score(fixture_1_reaction.reaction_smiles)
 
     sorted_cts = sorted(fixture_1_reaction.reaction_centers.keys())
@@ -903,11 +963,73 @@ def test_sear_signature_functionality() -> None:
 
     censor = ChemCensor(
         manager=db,
-        max_center_type=ReactionCenterType.RC1,
-        find_exact_match=False,
+        config=ChemCensorConfig(
+            max_center_type=ReactionCenterType.RC1,
+            find_exact_match=False,
+        ),
     )
     score = censor.score(SEAR_QUERY_ACETOPHENONE_BROMINATION)
     assert score == ScoringConfig.default_reaction_scoring.value
+
+
+# ---------------------------------------------------------------------------
+# Stereochemistry of the reacting atom in RC1 lookups
+# ---------------------------------------------------------------------------
+
+# Substitution at a benzylic stereocentre, written three ways: one enantiomer,
+# its mirror image, and the same skeleton with no configuration assigned.
+_TRIAZOLE_SUBSTITUTION_R = (
+    "O[C@H:3]([CH2:2][CH3:1])[c:4]1[cH:5][cH:6][cH:7][cH:8][cH:9]1."
+    "[nH:10]1[cH:11][cH:12][cH:13][n:14]1>>"
+    "[CH3:1][CH2:2][C@H:3]([c:4]1[cH:5][cH:6][cH:7][cH:8][cH:9]1)"
+    "[n:10]1[cH:11][cH:12][cH:13][n:14]1"
+)
+_TRIAZOLE_SUBSTITUTION_S = (
+    "O[C@@H:3]([CH2:2][CH3:1])[c:4]1[cH:5][cH:6][cH:7][cH:8][cH:9]1."
+    "[nH:10]1[cH:11][cH:12][cH:13][n:14]1>>"
+    "[CH3:1][CH2:2][C@@H:3]([c:4]1[cH:5][cH:6][cH:7][cH:8][cH:9]1)"
+    "[n:10]1[cH:11][cH:12][cH:13][n:14]1"
+)
+_TRIAZOLE_SUBSTITUTION_FLAT = (
+    "O[CH:3]([CH2:2][CH3:1])[c:4]1[cH:5][cH:6][cH:7][cH:8][cH:9]1."
+    "[nH:10]1[cH:11][cH:12][cH:13][n:14]1>>"
+    "[CH3:1][CH2:2][CH:3]([c:4]1[cH:5][cH:6][cH:7][cH:8][cH:9]1)"
+    "[n:10]1[cH:11][cH:12][cH:13][n:14]1"
+)
+
+
+def _rc1_reference(reaction_smiles: str) -> Reaction:
+    """Run the full pipeline on a reaction and extract RC1 from it."""
+    reaction = ReactionProcessor().process(Reaction(reaction_smiles=reaction_smiles))
+    return ReactionCenterExtractor(
+        max_center_type=ReactionCenterType.RC1,
+    ).extract_rc(reaction)
+
+
+@pytest.mark.parametrize(
+    "query",
+    [_TRIAZOLE_SUBSTITUTION_S, _TRIAZOLE_SUBSTITUTION_FLAT],
+    ids=["mirror_image", "no_configuration_assigned"],
+)
+def test_rc1_lookup_distinguishes_the_reacting_configuration(query: str) -> None:
+    """An RC1 key only matches a reference of the same absolute configuration.
+
+    A database built from one enantiomer does not cover the other, nor a
+    substrate drawn without stereochemistry — worth pinning down, because it is
+    what decides how much of a reference database a stereo-defined query reaches.
+    """
+    reference_smiles = _strip_atom_maps(_TRIAZOLE_SUBSTITUTION_R)
+    db = _build_manager(_rc1_reference(reference_smiles))
+    censor = ChemCensor(
+        manager=db,
+        config=ChemCensorConfig(max_center_type=1, find_exact_match=False),
+    )
+
+    assert censor.score(reference_smiles) == ScoringConfig.lc_1_scoring.value
+    assert (
+        censor.score(_strip_atom_maps(query))
+        == ScoringConfig.default_reaction_scoring.value
+    )
 
 
 def test_score_fg_mismatch_at_higher_center_returns_lower_score(
@@ -927,6 +1049,6 @@ def test_score_fg_mismatch_at_higher_center_returns_lower_score(
     zeros = np.zeros(FG_SIGNATURE_LENGTH, dtype=np.uint8)
     overrides = {ct: zeros for ct in sorted_cts[1:]}
     db = _build_manager(fixture_1_reaction, overrides)
-    censor = ChemCensor(manager=db, find_exact_match=False)
+    censor = ChemCensor(manager=db, config=ChemCensorConfig(find_exact_match=False))
     score = censor.score(fixture_1_reaction.reaction_smiles)
     assert score == ScoringConfig[f"lc_{sorted_cts[0]}_scoring"].value

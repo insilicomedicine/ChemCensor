@@ -3,6 +3,7 @@ from rdkit import Chem
 
 from chemcensor.basic import Molecule
 from chemcensor.basic.reaction_center import ReactionCenterType
+from chemcensor.basic.utils import mol_to_smiles_keeping_stereo
 from chemcensor.configs import ExtractionConfig
 from chemcensor.extraction.molecule_fragment_extractor import (
     MolecularFragmentExtractor,
@@ -25,6 +26,14 @@ def _map_to_idx(mol: Molecule, map_num: int) -> int:
 def _maps_to_idxs(mol: Molecule, *map_nums: int) -> list[int]:
     """Get atom indices by atom map numbers."""
     return [_map_to_idx(mol, m) for m in map_nums]
+
+
+def _fragment_smiles(config: ExtractionConfig, mol: Molecule, *core_maps: int) -> str:
+    """Extract a fragment around the given atom maps and write it as SMILES."""
+    frag, _ = MolecularFragmentExtractor(config).extract_fragment(
+        mol, _maps_to_idxs(mol, *core_maps)
+    )
+    return mol_to_smiles_keeping_stereo(frag)
 
 
 # ============================================================================
@@ -57,6 +66,31 @@ def naphthalene() -> Molecule:
 def acetone() -> Molecule:
     """Acetone: CH3-C(=O)-CH3 — contains C=O functional group."""
     smiles = "[CH3:1][C:2](=[O:3])[CH3:4]"
+    return Molecule.from_atom_mapped_smiles(smiles)
+
+
+@pytest.fixture
+def chiral_bromide() -> Molecule:
+    """1-bromoethanol: the stereocentre (:2) carries the leaving group (:4)."""
+    smiles = "[CH3:1][C@H:2]([OH:3])[Br:4]"
+    return Molecule.from_atom_mapped_smiles(smiles)
+
+
+@pytest.fixture
+def chiral_neighbour_bromide() -> Molecule:
+    """3-bromopropan-2-ol: the stereocentre (:2) sits next to the core (:4)."""
+    smiles = "[CH3:1][C@H:2]([OH:3])[CH2:4][Br:5]"
+    return Molecule.from_atom_mapped_smiles(smiles)
+
+
+@pytest.fixture
+def hexan_3_ol() -> Molecule:
+    """Hexan-3-ol: the stereocentre (:2) sits between the two core atoms.
+
+    Its ethyl and propyl arms both shrink to a bare ``CH3`` stub once the
+    fragment is cut, which makes the two substituents indistinguishable.
+    """
+    smiles = "[CH3:6][CH2:1][C@H:2](O)[CH2:3][CH2:7][CH3:8]"
     return Molecule.from_atom_mapped_smiles(smiles)
 
 
@@ -275,6 +309,79 @@ class TestFunctionalGroupExpansion:
         c_idx = _map_to_idx(acetone, 2)  # carbonyl carbon
         _, indices = ext.extract_fragment(acetone, [o_idx])
         assert c_idx in indices
+
+
+# ============================================================================
+# Stereo tags
+# ============================================================================
+
+
+class TestStereoTags:
+    """Which chiral tags survive the cut, and which are cleared as meaningless."""
+
+    BASE = ExtractionConfig(center_type=ReactionCenterType.RC1)
+    BARE_CORE = ExtractionConfig(center_type=ReactionCenterType.RC1, neighbor_depth=0)
+    NO_TAGS = ExtractionConfig(
+        center_type=ReactionCenterType.RC1, include_stereo_tags=False
+    )
+
+    def test_reacting_atom_keeps_its_tag(self, chiral_bromide: Molecule) -> None:
+        """A tag on a core atom is the retention/inversion signal — always kept.
+
+        RDKit no longer perceives the truncated centre as a stereocentre, so
+        this only holds because core atoms bypass perception.
+        """
+        assert "@" in _fragment_smiles(self.BASE, chiral_bromide, 2)
+
+    def test_atom_that_lost_a_substituent_is_cleared(
+        self, chiral_bromide: Molecule
+    ) -> None:
+        """A tag needs all four substituents; here every one of them is cut away.
+
+        Core atoms are exempt from stereo perception, so only the degree check
+        can catch this — and something has to, or the centre is written out as
+        the impossible ``[C@H:2]`` with no substituents left to arrange.
+        """
+        assert _fragment_smiles(self.BARE_CORE, chiral_bromide, 2) == "[CH:2]"
+
+    def test_context_atom_that_lost_a_substituent_is_cleared(
+        self, chiral_neighbour_bromide: Molecule
+    ) -> None:
+        """Two of the stereocentre's four substituents are outside the cut.
+
+        Keeping the tag would write it out as ``[C@H3:2]``, an atom that cannot
+        exist.
+        """
+        smiles = _fragment_smiles(self.BASE, chiral_neighbour_bromide, 4)
+        assert smiles == "[CH3:2][CH2:4][Br:5]"
+
+    def test_context_atom_whose_substituents_became_equal_is_cleared(
+        self, hexan_3_ol: Molecule
+    ) -> None:
+        """The centre keeps its degree, but its two arms are cut to the same stub.
+
+        Both enantiomers of the substrate reach this same fragment, so a tag
+        would split one reaction center into two database keys.
+        """
+        smiles = _fragment_smiles(self.BASE, hexan_3_ol, 1, 3)
+        assert "@" not in smiles
+        assert smiles == "O[CH:2]([CH2:1][CH3:6])[CH2:3][CH3:7]"
+
+    @pytest.mark.parametrize(
+        ("smiles", "core_maps"),
+        [
+            ("[CH3:1][C@H:2]([OH:3])[Br:4]", (2,)),
+            ("[CH3:1][C@H:2]([OH:3])[CH2:4][Br:5]", (4,)),
+            ("[CH3:6][CH2:1][C@H:2](O)[CH2:3][CH2:7][CH3:8]", (1, 3)),
+        ],
+        ids=["core_stereocentre", "context_stereocentre", "between_two_core_atoms"],
+    )
+    def test_no_tags_at_all_when_disabled(
+        self, smiles: str, core_maps: tuple[int, ...]
+    ) -> None:
+        """``include_stereo_tags=False`` strips tags from core atoms too."""
+        mol = Molecule.from_atom_mapped_smiles(smiles)
+        assert "@" not in _fragment_smiles(self.NO_TAGS, mol, *core_maps)
 
 
 # ============================================================================

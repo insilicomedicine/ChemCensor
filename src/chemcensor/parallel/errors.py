@@ -15,3 +15,16 @@ class ScorerCrashedError(ParallelError):
 
 class CheckpointCorruptedError(ParallelError):
     """The checkpoint file exists but its contents could not be parsed."""
+
+
+class MalformedCsvError(ParallelError):
+    """A CSV cannot be rewritten without losing data."""
+
+
+class OutputSchemaMismatchError(ParallelError):
+    """The output CSV header does not match the schema this version writes.
+
+    Raised on resume/append when an existing result file was produced by an
+    older (or differently configured) ChemCensor and cannot safely receive
+    new rows.
+    """

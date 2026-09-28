@@ -7,8 +7,12 @@ classDiagram
     ChemCensor --> DBManager
     ChemCensor --> ReactionProcessor
     ChemCensor --> ReactionCenterExtractor
+    ChemCensor --> ChemCensorConfig
     ChemCensor --> ScoringConfig
     ChemCensor --> ScoreResult
+
+    ChemCensorConfig --> ReactionProcessor
+    CompositionPipelineConfig --> ReactionProcessor
 
     ReactionCenterDBComposer --> DBManager
     ReactionCenterDBComposer --> Processor
@@ -34,6 +38,7 @@ classDiagram
     SeArAnnotator ..|> Processor
     SisAnnotator ..|> Processor
     StaticStereoValidator ..|> Processor
+    SkeletonConservationValidator ..|> Processor
     BatchFilter ..|> Processor
 
     Processor --> Reaction
@@ -42,6 +47,7 @@ classDiagram
     SisAnnotator --> MoleculeStereoSpecification
     StaticStereoValidator --> MoleculeStereoSpecification
     StaticStereoValidator --> ReactionTransform
+    SkeletonConservationValidator --> ReactionTransform
 
     %% ============================================================
     %% Extraction pipeline
@@ -127,10 +133,38 @@ classDiagram
         <<Enum>>
     }
 
+    class ChemCensorConfig {
+        <<Dataclass / frozen>>
+        +int max_center_type
+        +bool find_exact_match
+        +bool check_functional_groups
+        +bool use_fake_mapper
+        +bool mapper_in_subprocess
+        +bool validate_input
+        +bool check_skeleton_conservation
+        +bool check_static_stereo
+        +build_processor() ReactionProcessor
+    }
+
+    class CompositionPipelineConfig {
+        <<Dataclass / frozen>>
+        +bool use_fake_mapper
+        +bool mapper_in_subprocess
+        +int mapper_batch_size
+        +bool validate_input
+        +bool check_skeleton_conservation
+        +bool check_static_stereo
+        +build_processor() ReactionProcessor
+    }
+
     class ScoreResult {
         <<Dataclass / frozen>>
         +float with_functional_groups
         +float without_functional_groups
+        +bool all_fgs_precedents_are_real
+        +int total_number_of_fgs
+        +int number_of_fgs_covered_by_virtual_precedents
+        +bool all_center_precedents_are_real
         +uniform(float value) ScoreResult
         +select(bool check_functional_groups) float
     }
@@ -193,6 +227,13 @@ classDiagram
     }
 
     class StaticStereoValidator {
+        +process(Reaction reaction) Reaction
+        +process_batch(Sequence[Reaction] reactions) Sequence[Reaction]
+    }
+
+    class SkeletonConservationValidator {
+        +int | None max_fragment_size
+        +bool check_additions
         +process(Reaction reaction) Reaction
         +process_batch(Sequence[Reaction] reactions) Sequence[Reaction]
     }
@@ -342,6 +383,7 @@ classDiagram
         +bool include_fused
         +bool include_substituents
         +bool include_chiral
+        +bool include_stereo_tags
         -Molecule mol
         -set[int] core_indices
         -set[int] all_indices
@@ -354,6 +396,9 @@ classDiagram
         -_add_chiral_atoms()
         -_add_functional_group_atoms()
         -_create_fragment_molecule() tuple[Chem.Mol, list[int]]
+        -_drop_truncated_stereo_tags(Chem.RWMol fragment, dict[int, int] atom_mapping)
+        -_drop_unperceived_context_stereo_tags(Chem.RWMol fragment, dict[int, int] atom_mapping)
+        -_perceived_stereo_atoms(Chem.RWMol fragment) set[int] | None
     }
 
     class ExtractionConfig {
@@ -364,6 +409,7 @@ classDiagram
         +bool include_fused
         +bool include_substituents
         +bool include_chiral
+        +bool include_stereo_tags
     }
 
     class FGFinder {
@@ -384,6 +430,7 @@ classDiagram
     MapperCrashedError --|> ParallelError
     ScorerCrashedError --|> ParallelError
     CheckpointCorruptedError --|> ParallelError
+    MalformedCsvError --|> ParallelError
 
     class ParallelConfig {
         <<Dataclass / frozen>>
@@ -401,7 +448,11 @@ classDiagram
         +int | None maxtasksperchild
         +int mapper_internal_batch_size
         +bool use_fake_mapper
+        +bool validate_input
+        +bool check_skeleton_conservation
+        +bool check_static_stereo
         +dict[str, str] worker_extra_env
+        +bool include_canonical_smiles
         +resolved() ParallelConfig
     }
 
@@ -441,6 +492,11 @@ classDiagram
         +close()
     }
 
+    class MappedRxnDump {
+        +write(Iterable[tuple[int, str, str | None]] items)
+        +close()
+    }
+
     class CheckpointState {
         <<Dataclass / frozen>>
         +int last_contiguous_idx
@@ -461,5 +517,9 @@ classDiagram
     }
 
     class CheckpointCorruptedError {
+        <<Exception>>
+    }
+
+    class MalformedCsvError {
         <<Exception>>
     }

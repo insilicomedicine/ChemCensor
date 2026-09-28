@@ -10,11 +10,11 @@ from chemcensor.basic import Reaction
 from chemcensor.basic import ReactionCenterType
 from chemcensor.basic import SENTINEL
 from chemcensor.basic.reaction_transform import ReactionTransform
+from chemcensor.configs.chemcensor_config import ChemCensorConfig
 from chemcensor.extraction.errors import MissingReactingAtomsError
 from chemcensor.extraction.errors import MissingReactionTransformError
 from chemcensor.extraction.errors import ReactionCenterExtractorError
 from chemcensor.extraction.reaction_center_extractor import ReactionCenterExtractor
-from chemcensor.processing.reaction_processor import DEFAULT_PROCESSORS
 from chemcensor.processing.reaction_processor import ReactionProcessor
 from chemcensor.rules.functional_groups import FG_SIGNATURE_LENGTH
 
@@ -51,7 +51,7 @@ def reactions_list() -> list[str]:
 
 @pytest.fixture
 def processor() -> ReactionProcessor:
-    return ReactionProcessor(processors=DEFAULT_PROCESSORS)
+    return ChemCensorConfig().build_processor()
 
 
 @pytest.fixture
@@ -485,7 +485,7 @@ def test_linear_configs_include_chiral(
 
 
 # =============================================================================
-# Spectator ions: RC SMILES uses light-atom forms (N, O), not [NH4], [OH]
+# Charge handling: RC SMILES preserves the ionized form of atoms
 # =============================================================================
 
 _REACTION_AMMONIUM_DECARBOXYLATION = (
@@ -500,39 +500,42 @@ _REACTION_AMIDATION_WITH_HYDROXIDE = (
 )
 
 
-def test_reaction_center_smiles_ammonium_spectator_is_n_not_bracket_nh4(
+def test_reaction_center_smiles_preserves_ammonium_spectator_charge(
     processor: ReactionProcessor,
     rc_extractor: ReactionCenterExtractor,
 ) -> None:
-    """Unmapped ammonium in the reactant pool must not appear as ``[NH4]`` in RC1."""
+    """An unmapped ammonium spectator keeps its ionized ``[NH4+]`` form in RC1."""
     reaction = Reaction(reaction_smiles=_REACTION_AMMONIUM_DECARBOXYLATION)
     reaction = processor.process(reaction)
     reaction = rc_extractor.extract_rc(reaction)
     rc1 = reaction.get_reaction_center_by_type(ReactionCenterType.RC1)
     smiles = rc1.reaction_center_smiles
-    assert "[NH4]" not in smiles
-    assert ".N>>" in smiles
+    assert "[NH4+]" in smiles
 
 
-def test_reaction_center_smiles_hydroxide_spectator_is_o_not_bracket_oh(
+def test_reaction_center_smiles_preserves_hydroxide_spectator_charge(
     processor: ReactionProcessor,
     rc_extractor: ReactionCenterExtractor,
 ) -> None:
-    """Unmapped hydroxide in the reactant pool must not appear as ``[OH]`` in RC1."""
+    """An unmapped hydroxide spectator keeps its ionized ``[OH-]`` form in RC1."""
     reaction = Reaction(reaction_smiles=_REACTION_AMIDATION_WITH_HYDROXIDE)
     reaction = processor.process(reaction)
     reaction = rc_extractor.extract_rc(reaction)
     rc1 = reaction.get_reaction_center_by_type(ReactionCenterType.RC1)
     smiles = rc1.reaction_center_smiles
-    assert "[OH]" not in smiles
-    assert smiles.startswith("O.")
+    assert "[OH-]" in smiles
 
 
 def test_no_extra_hydrogens_in_rc_smiles(
     processor: ReactionProcessor,
     rc_extractor: ReactionCenterExtractor,
 ) -> None:
-    """No extra hydrogens in the RC SMILES."""
+    """Explicit hydrogens appear only on charge-bearing atoms.
+
+    The reacting secondary amine is protonated (``[NH2+]``) in the reactant, so
+    its charge and the hydrogens implied by that charge are preserved in the RC;
+    neutral atoms carry no spurious explicit hydrogens.
+    """
     smiles = (
         "CS(=O)(=O)c1ccc(-c2cc[nH]c(=O)c2C[C@H]2CC[NH2+]C2)cc1.O=C(O)c1nncs1"
         ">>"
@@ -543,23 +546,24 @@ def test_no_extra_hydrogens_in_rc_smiles(
     reaction = rc_extractor.extract_rc(reaction)
     rc1 = reaction.get_reaction_center_by_type(ReactionCenterType.RC1)
     rc_smiles = rc1.reaction_center_smiles
-    assert "H" not in rc_smiles
-    assert rc_smiles == "CNC.cC(O)=O>>cC(=O)N(C)C"
+    assert rc_smiles == "C[NH2+]C.cC(O)=O>>cC(=O)N(C)C"
 
 
 def test_no_extra_hydrogens_in_static_part_of_rc_smiles(
     processor: ReactionProcessor,
     rc_extractor: ReactionCenterExtractor,
 ) -> None:
-    """No extra hydrogens in the RC2."""
+    """A protonated ring amine in the static part keeps its ``[NH2+]`` charge.
+
+    No spurious explicit hydrogens are added to the neutral atoms of the RC2.
+    """
     smiles = "CC1[NH2+]CCN(CC2=CC=CC=C2)C1>>CC3[NH2+]CCNC3"
     reaction = Reaction(reaction_smiles=smiles)
     reaction = processor.process(reaction)
     reaction = rc_extractor.extract_rc(reaction)
     rc2 = reaction.get_reaction_center_by_type(ReactionCenterType.RC2)
     rc_smiles = rc2.reaction_center_smiles
-    assert "H" not in rc_smiles
-    assert rc_smiles == "C1CN(Cc2ccccc2)CCN1>>C1CNCCN1"
+    assert rc_smiles == "C1CN(Cc2ccccc2)CC[NH2+]1>>C1C[NH2+]CCN1"
 
 
 def test_reaction_with_hydrogen_in_rc(

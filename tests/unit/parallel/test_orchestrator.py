@@ -8,8 +8,103 @@ import pytest
 
 from chemcensor.parallel import checkpoint as ckpt_mod
 from chemcensor.parallel import orchestrator
+from chemcensor.parallel.config import ParallelConfig
 from chemcensor.parallel.io import ListSink
+from chemcensor.parallel.messages import make_scored_item
 from chemcensor.parallel.messages import Result
+
+
+class _FinishedMapper:
+    def __init__(self, name: str, events: list[str], exitcode: int = 0) -> None:
+        self.name = name
+        self.exitcode = exitcode
+        self._events = events
+
+    def join(self, timeout: float | None = None) -> None:
+        self._events.append(f"joined:{self.name}")
+
+
+class _RecordingQueue:
+    def __init__(self, events: list[str]) -> None:
+        self._events = events
+
+    def put(self, item: object) -> None:
+        assert item is None
+        self._events.append("sentinel")
+
+
+class _PendingMapper:
+    exitcode = None
+
+    def __init__(
+        self,
+        name: str,
+        events: list[str],
+        error_event: threading.Event,
+    ) -> None:
+        self.name = name
+        self._events = events
+        self._error_event = error_event
+
+    def join(self, timeout: float | None = None) -> None:
+        self._events.append(f"joined:{self.name}")
+        self._error_event.set()
+
+
+def test_worker_sentinels_are_sent_after_all_mappers_join() -> None:
+    events: list[str] = []
+    mappers = [
+        _FinishedMapper("mapper-0", events),
+        _FinishedMapper("mapper-1", events),
+    ]
+
+    orchestrator._signal_workers_after_mappers(
+        mappers,
+        _RecordingQueue(events),
+        n_workers=2,
+        stop_event=threading.Event(),
+        error_event=threading.Event(),
+    )
+
+    assert events == [
+        "joined:mapper-0",
+        "joined:mapper-1",
+        "sentinel",
+        "sentinel",
+    ]
+
+
+def test_failed_mapper_does_not_signal_workers() -> None:
+    events: list[str] = []
+    error_event = threading.Event()
+
+    orchestrator._signal_workers_after_mappers(
+        [_FinishedMapper("mapper-0", events, exitcode=1)],
+        _RecordingQueue(events),
+        n_workers=2,
+        stop_event=threading.Event(),
+        error_event=error_event,
+    )
+
+    assert events == ["joined:mapper-0"]
+    assert error_event.is_set()
+
+
+def test_mapper_completion_stops_polling_on_abort() -> None:
+    events: list[str] = []
+    error_event = threading.Event()
+    mapper = _PendingMapper("mapper-0", events, error_event)
+
+    orchestrator._signal_workers_after_mappers(
+        [mapper],
+        _RecordingQueue(events),
+        n_workers=2,
+        stop_event=threading.Event(),
+        error_event=error_event,
+    )
+
+    assert events == ["joined:mapper-0"]
+    assert error_event.is_set()
 
 
 def _run_writer(
@@ -63,7 +158,10 @@ def test_periodic_checkpoint_fires_when_batch_size_does_not_divide_interval(
     messages = [
         Result(
             batch_id=b,
-            items=tuple((b * 3 + j, f"R{b * 3 + j}>>P", 1.0, 1.0) for j in range(3)),
+            items=tuple(
+                make_scored_item(b * 3 + j, f"R{b * 3 + j}>>P", 1.0, 1.0)
+                for j in range(3)
+            ),
         )
         for b in range(4)
     ]
@@ -100,9 +198,27 @@ def test_checkpoint_delta_counts_from_resumed_state(
     # Resume at 100; first batch adds 2 (→102, delta 2 < 5: no save),
     # second batch adds 2 (→104, delta 4 < 5: no save) until the threshold.
     messages = [
-        Result(batch_id=0, items=((100, "a>>b", 1.0, 1.0), (101, "c>>d", 1.0, 1.0))),
-        Result(batch_id=1, items=((102, "e>>f", 1.0, 1.0), (103, "g>>h", 1.0, 1.0))),
-        Result(batch_id=2, items=((104, "i>>j", 1.0, 1.0), (105, "k>>l", 1.0, 1.0))),
+        Result(
+            batch_id=0,
+            items=(
+                make_scored_item(100, "a>>b", 1.0, 1.0),
+                make_scored_item(101, "c>>d", 1.0, 1.0),
+            ),
+        ),
+        Result(
+            batch_id=1,
+            items=(
+                make_scored_item(102, "e>>f", 1.0, 1.0),
+                make_scored_item(103, "g>>h", 1.0, 1.0),
+            ),
+        ),
+        Result(
+            batch_id=2,
+            items=(
+                make_scored_item(104, "i>>j", 1.0, 1.0),
+                make_scored_item(105, "k>>l", 1.0, 1.0),
+            ),
+        ),
     ]
 
     _run_writer(
@@ -123,3 +239,12 @@ def test_checkpoint_delta_counts_from_resumed_state(
     assert any(
         s.completed_count == 106 for s in saved
     ), f"expected a periodic save at 106: {saved}"
+
+
+def test_hide_gpu_from_mappers() -> None:
+    assert orchestrator._hide_gpu_from_mappers(ParallelConfig()) is False
+    assert orchestrator._hide_gpu_from_mappers(ParallelConfig(use_cpu=True)) is True
+    assert (
+        orchestrator._hide_gpu_from_mappers(ParallelConfig(use_fake_mapper=True))
+        is True
+    )

@@ -126,19 +126,19 @@ _REACTION_CENTER_TEST_CASES: list[ReactionCenterTestCase] = [
         expected_rc_components={
             ReactionCenterType.RC1: (
                 "O=CCBr.O=c[nH]c=O>>O=CCn(c=O)c=O",
-                "NO.OC(O)=O.cC#N>>c-c1noc(=O)[nH]1",
+                "OC(=O)[O-].[NH3+]O.cC#N>>c-c1noc(=O)[nH]1",
             ),
             ReactionCenterType.RC2: (
                 "O=CCBr.O=c1ccnc(=O)[nH]1>>O=CCn1c(=O)ccnc1=O",
-                "N#Cc1ccccc1.NO.OC(O)=O>>O=c1[nH]c(-c2ccccc2)no1",
+                "N#Cc1ccccc1.OC(=O)[O-].[NH3+]O>>O=c1[nH]c(-c2ccccc2)no1",
             ),
             ReactionCenterType.RC3: (
                 "O=CCBr.O=c1nc2sccc2c(=O)[nH]1>>O=CCn1c(=O)nc2sccc2c1=O",
-                "N#Cc1ccccc1.NO.OC(O)=O>>O=c1[nH]c(-c2ccccc2)no1",
+                "N#Cc1ccccc1.OC(=O)[O-].[NH3+]O>>O=c1[nH]c(-c2ccccc2)no1",
             ),
             ReactionCenterType.RC4: (
                 "Cc1cc2c(=O)[nH]c(=O)n(C)c2s1.O=CCBr>>Cc1cc2c(=O)n(CC=O)c(=O)n(C)c2s1",
-                "NO.OC(O)=O.c-c1cc(F)ccc1C#N>>c-c1cc(F)ccc1-c1noc(=O)[nH]1",
+                "OC(=O)[O-].[NH3+]O.c-c1cc(F)ccc1C#N>>c-c1cc(F)ccc1-c1noc(=O)[nH]1",
             ),
         },
         expected_rc_is_composite={
@@ -222,7 +222,7 @@ _REACTION_CENTER_TEST_CASES: list[ReactionCenterTestCase] = [
         id="acid_deprotonation",
         reaction_mapped_smiles=("[C:1](=[O:2])[OH:3]>>[C:1](=[O:2])[O-:3]"),
         expected_rc_components={
-            ReactionCenterType.RC1: ("OC=O>>OC=O",),
+            ReactionCenterType.RC1: ("OC=O>>O=C[O-]",),
         },
         expected_rc_is_composite={
             ReactionCenterType.RC1: False,

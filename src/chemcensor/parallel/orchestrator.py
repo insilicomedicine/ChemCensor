@@ -34,6 +34,20 @@ _DEFAULT_WATCHDOG_INTERVAL = 2.0
 _CUDA_ENV_VAR = "CUDA_VISIBLE_DEVICES"
 
 
+def _hide_gpu_from_mappers(config: ParallelConfig) -> bool:
+    """Return whether mapper subprocesses should inherit no CUDA devices.
+
+    Fake-mapper processes never load rxnmapper. ``use_cpu`` forces rxnmapper
+    onto CPU so several mapper processes do not contend for GPU memory.
+
+    :param config: Parallel pipeline configuration.
+    :type config: ParallelConfig
+    :return: ``True`` when mapper processes must start with the GPU hidden.
+    :rtype: bool
+    """
+    return config.use_fake_mapper or config.use_cpu
+
+
 @contextmanager
 def _scorers_gpu_hidden(worker_extra_env: dict[str, str] | None) -> Iterator[None]:
     """Temporarily set ``CUDA_VISIBLE_DEVICES`` for spawning scorer workers.
@@ -93,9 +107,8 @@ def _reader_thread(
 
     Honours ``stop_event`` and ``error_event`` so a downstream crash can
     abort the read cleanly.  Emits one ``None`` sentinel per mapper after
-    the source is exhausted (each mapper consumes exactly one and the last
-    one fans out further sentinels to the scorers). Sentinels are enqueued
-    last, so the FIFO queue guarantees all real batches are picked up
+    the source is exhausted (each mapper consumes exactly one). Sentinels are
+    enqueued last, so the FIFO queue guarantees all real batches are picked up
     before any mapper stops.
     """
     try:
@@ -114,6 +127,40 @@ def _reader_thread(
                 logger.debug(
                     "Reader: enqueue of end-of-stream sentinel failed", exc_info=True
                 )
+
+
+def _signal_workers_after_mappers(
+    mapper_procs: list[Any],
+    score_queue: Any,
+    *,
+    n_workers: int,
+    stop_event: threading.Event,
+    error_event: threading.Event,
+) -> None:
+    """Signal workers only after every mapper has flushed its queue writes.
+
+    ``multiprocessing.Queue`` preserves order per producer, not across
+    producers. A sentinel emitted by the last mapper process can therefore
+    overtake tasks buffered by another mapper. Joining all mapper processes in
+    the parent guarantees their queue feeder threads have flushed before this
+    single producer appends the terminal sentinels. Bounded joins periodically
+    check the shared stop/error state so abort shutdown cannot be held open by
+    a hung mapper.
+    """
+    for mapper_proc in mapper_procs:
+        while True:
+            if stop_event.is_set() or error_event.is_set():
+                return
+            mapper_proc.join(timeout=_DEFAULT_WATCHDOG_INTERVAL)
+            if mapper_proc.exitcode is not None:
+                break
+        if mapper_proc.exitcode != 0:
+            error_event.set()
+            return
+    if stop_event.is_set() or error_event.is_set():
+        return
+    for _ in range(n_workers):
+        score_queue.put(None)
 
 
 def _writer_thread(
@@ -305,8 +352,8 @@ def run(
 
     :param source: Iterable yielding ``(idx, smiles)`` records.
     :type source: Iterable[tuple[int, str]]
-    :param sink: Sink that receives
-        ``(idx, smiles, score_with_fg, score_without_fg)`` results.
+    :param sink: Sink that receives scored result tuples
+        (scores plus FG-precedent provenance; see :data:`ScoredItem`).
     :type sink: ResultSink
     :param db_path: Path to the SQLite reaction-centers database.
     :type db_path: str | PathLike
@@ -343,10 +390,6 @@ def run(
     error_event = threading.Event()
     state = initial_state or ckpt_mod.CheckpointState()
 
-    # Shared counter so the last mapper to finish emits the scorer
-    # sentinels exactly once (see ``run_mapper``).
-    mappers_remaining: Any = ctx.Value("i", cfg.n_mappers)
-
     mapper_procs = [
         ctx.Process(
             target=run_mapper,
@@ -356,9 +399,9 @@ def run(
                 score_queue=score_queue,
                 threads=cfg.mapper_threads,
                 rxnmapper_batch_size=cfg.mapper_internal_batch_size,
-                n_scorers=cfg.n_workers,
-                mappers_remaining=mappers_remaining,
                 use_fake_mapper=cfg.use_fake_mapper,
+                use_cpu=cfg.use_cpu,
+                validate_input=cfg.validate_input,
             ),
             daemon=True,
         )
@@ -379,6 +422,10 @@ def run(
                 maxtasksperchild=cfg.maxtasksperchild,
                 extra_env=cfg.worker_extra_env or None,
                 use_fake_mapper=cfg.use_fake_mapper,
+                validate_input=cfg.validate_input,
+                check_skeleton_conservation=cfg.check_skeleton_conservation,
+                check_static_stereo=cfg.check_static_stereo,
+                include_canonical_smiles=cfg.include_canonical_smiles,
             ),
             daemon=True,
         )
@@ -403,9 +450,9 @@ def run(
     # not create a CUDA context per worker (each reserves hundreds of MB of
     # VRAM and adds start-up latency). ``spawn`` children snapshot the
     # parent's ``os.environ`` at ``start()``, so toggling it here is enough.
-    # With the fake mapper there is no rxnmapper at all, so mappers are
-    # CPU-only too and start with the GPU hidden as well.
-    if cfg.use_fake_mapper:
+    # Fake-mapper and ``use_cpu`` mappers never need the GPU, so they start
+    # with it hidden as well.
+    if _hide_gpu_from_mappers(cfg):
         with _scorers_gpu_hidden(cfg.worker_extra_env):
             for mp_proc in mapper_procs:
                 mp_proc.start()
@@ -460,14 +507,28 @@ def run(
         ),
         daemon=True,
     )
+    mapper_completion = threading.Thread(
+        target=_signal_workers_after_mappers,
+        name="chemcensor-mapper-completion",
+        kwargs=dict(
+            mapper_procs=mapper_procs,
+            score_queue=score_queue,
+            n_workers=cfg.n_workers,
+            stop_event=stop_event,
+            error_event=error_event,
+        ),
+        daemon=True,
+    )
 
     reader.start()
     writer.start()
     watchdog.start()
+    mapper_completion.start()
 
     try:
         writer.join()
         reader.join(timeout=_DEFAULT_JOIN_TIMEOUT)
+        mapper_completion.join(timeout=_DEFAULT_JOIN_TIMEOUT)
         # Drain in case error_event fired and reader still has sentinels queued.
         for mp_proc in mapper_procs:
             mp_proc.join(timeout=_DEFAULT_JOIN_TIMEOUT)

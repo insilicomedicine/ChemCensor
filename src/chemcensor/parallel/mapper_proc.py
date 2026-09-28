@@ -3,21 +3,16 @@ from __future__ import annotations
 import logging
 import multiprocessing.queues as mpq
 import os
-import re
+from os import PathLike
 from typing import Any
 from typing import Callable
 
+from .io import MappedRxnDump
 from .messages import MapTask
 from .messages import ScoreTask
 
 
 logger = logging.getLogger(__name__)
-
-# Matches the ``:N`` atom-map label inside a bracket atom (``[CH3:1]``).
-# Used to derive an unmapped reaction SMILES from a precomputed mapped one
-# without re-canonicalising (RDKit would reorder atoms and break the
-# index alignment FakeMapper relies on).
-_ATOM_MAP_RE = re.compile(r":\d+(?=[\]])")
 
 # A per-batch processor: maps ``(idx, smiles)`` items to scorer items
 # ``(idx, raw_smiles, mapped_smiles_or_None)``.
@@ -26,16 +21,22 @@ _BatchProcessor = Callable[
 ]
 
 
-def _set_thread_env(threads: int) -> None:
+def _set_thread_env(threads: int, *, use_cpu: bool = False) -> None:
     """Pin BLAS/OMP threads for this process before any heavy import.
 
     Must be called *before* importing ``torch`` / ``transformers`` /
     ``rxnmapper`` because those libraries cache the thread setting on
-    first import.
+    first import. ``use_cpu`` likewise has to land before the CUDA
+    context is created, so it is applied here rather than after the
+    model load.
 
     :param threads: Number of CPU threads the mapper may use.
     :type threads: int
+    :param use_cpu: When ``True``, hide CUDA so rxnmapper runs on CPU.
+    :type use_cpu: bool
     """
+    if use_cpu:
+        os.environ["CUDA_VISIBLE_DEVICES"] = ""
     threads_str = str(max(1, threads))
     os.environ.setdefault("OMP_NUM_THREADS", threads_str)
     os.environ.setdefault("MKL_NUM_THREADS", threads_str)
@@ -76,7 +77,11 @@ def _map_with_retry(mapper: Any, smiles_list: list[str]) -> list[str]:
     return mapped
 
 
-def _build_rxnmapper_processor(rxnmapper_batch_size: int) -> _BatchProcessor:
+def _build_rxnmapper_processor(
+    rxnmapper_batch_size: int,
+    *,
+    validate_input: bool = True,
+) -> _BatchProcessor:
     """Build the rxnmapper-backed per-batch processor.
 
     Validates the raw SMILES first (cheap, mapping-independent) so the
@@ -85,6 +90,9 @@ def _build_rxnmapper_processor(rxnmapper_batch_size: int) -> _BatchProcessor:
 
     :param rxnmapper_batch_size: ``batch_size`` for the
         :class:`rxnmapper.BatchedMapper`.
+    :param validate_input: When ``True`` (default), run the preliminary
+        :class:`~chemcensor.processing.validator.Validator` before mapping.
+    :type validate_input: bool
     :return: A callable turning ``MapTask`` items into ``ScoreTask`` items.
     :rtype: _BatchProcessor
     """
@@ -95,9 +103,11 @@ def _build_rxnmapper_processor(rxnmapper_batch_size: int) -> _BatchProcessor:
     from chemcensor.processing.validator import Validator
 
     mapper = BatchedMapper(canonicalize=True, batch_size=rxnmapper_batch_size)
-    validator = Validator()
+    validator = Validator() if validate_input else None
 
     def _is_valid(smiles: str) -> bool:
+        if validator is None:
+            return True
         try:
             validator.process(Reaction(reaction_smiles=smiles))
             return True
@@ -143,14 +153,12 @@ def _build_fake_processor() -> _BatchProcessor:
     :return: A callable turning ``MapTask`` items into ``ScoreTask`` items.
     :rtype: _BatchProcessor
     """
-    from frozendict import frozendict
-
-    from chemcensor.basic import Reaction
     from chemcensor.processing.errors import ProcessingError
     from chemcensor.processing.fake_mapper import FakeMapper
     from chemcensor.processing.utils import (
-        prepare_fake_mapper_meta_from_mapped_rxn as _prepare_meta,
+        reaction_from_precomputed_mapping,
     )
+    from chemcensor.processing.utils import strip_atom_map_labels
 
     fake = FakeMapper()
 
@@ -159,18 +167,21 @@ def _build_fake_processor() -> _BatchProcessor:
     ) -> tuple[tuple[int, str, str | None], ...]:
         out: list[tuple[int, str, str | None]] = []
         for idx, mapped_input in items:
-            raw = _ATOM_MAP_RE.sub("", mapped_input)
             try:
-                meta = _prepare_meta(mapped_input)
-                reaction = fake.process(
-                    Reaction(reaction_smiles=raw, meta=frozendict(meta))
+                reaction_input = reaction_from_precomputed_mapping(mapped_input)
+                reaction = fake.process(reaction_input)
+                out.append(
+                    (
+                        idx,
+                        reaction_input.reaction_smiles,
+                        reaction.mapped_reaction_smiles,
+                    )
                 )
-                out.append((idx, raw, reaction.mapped_reaction_smiles))
             except ProcessingError:
-                out.append((idx, raw, None))
+                out.append((idx, strip_atom_map_labels(mapped_input), None))
             except Exception as e:  # last-ditch safety net
                 logger.warning("FakeMapper failed on %r: %s", mapped_input, e)
-                out.append((idx, raw, None))
+                out.append((idx, strip_atom_map_labels(mapped_input), None))
         return tuple(out)
 
     return _process
@@ -182,9 +193,10 @@ def run_mapper(
     *,
     threads: int,
     rxnmapper_batch_size: int,
-    n_scorers: int,
-    mappers_remaining: Any = None,
     use_fake_mapper: bool = False,
+    use_cpu: bool = False,
+    validate_input: bool = True,
+    mapped_dump_path: str | PathLike | None = None,
 ) -> None:
     """Entry point executed inside the mapper subprocess.
 
@@ -192,9 +204,9 @@ def run_mapper(
     SMILES (cheap, mapping-independent), runs the valid ones through
     :func:`_map_with_retry`, and forwards :class:`ScoreTask` messages to
     ``score_queue``.  Reactions that fail validation skip rxnmapper and are
-    forwarded with ``mapped=None``.  A ``None`` sentinel on ``map_queue``
-    triggers shutdown; the mapper then enqueues ``n_scorers`` sentinels
-    on ``score_queue`` so each scorer worker can drain and exit.
+    forwarded with ``mapped=None``. A ``None`` sentinel on ``map_queue``
+    triggers shutdown. The parent orchestrator emits worker sentinels only
+    after every mapper has exited and flushed its queue writes.
 
     :param map_queue: Inbound queue with :class:`MapTask` items.
     :type map_queue: multiprocessing.Queue
@@ -205,20 +217,22 @@ def run_mapper(
     :param rxnmapper_batch_size: ``batch_size`` for the
         :class:`rxnmapper.BatchedMapper`.
     :type rxnmapper_batch_size: int
-    :param n_scorers: Number of sentinels to emit on shutdown.
-    :type n_scorers: int
-    :param mappers_remaining: Optional shared counter (``multiprocessing``
-        ``Value``) used to coordinate sentinel emission when several mapper
-        processes share ``score_queue``. Each mapper decrements it on exit;
-        the last one to finish emits the ``n_scorers`` sentinels so every
-        scorer drains exactly once. ``None`` means this is the only mapper.
-    :type mappers_remaining: multiprocessing.Value | None
     :param use_fake_mapper: When ``True`` the input SMILES are precomputed
         atom-mapped reactions and :class:`FakeMapper` is used instead of
         ``rxnmapper`` (no GPU, no model import).
     :type use_fake_mapper: bool
+    :param use_cpu: When ``True``, hide CUDA before importing rxnmapper so
+        atom mapping runs on CPU. Ignored on the FakeMapper path.
+    :type use_cpu: bool
+    :param validate_input: When ``True`` (default), run the preliminary
+        SMILES validator before rxnmapper. Ignored on the FakeMapper path.
+    :type validate_input: bool
+    :param mapped_dump_path: When set, every mapped reaction is also streamed
+        as ``idx,mapped_rxn`` to this shard file (one per mapper), so the
+        caller can persist the atom maps and reuse them on a later run.
+    :type mapped_dump_path: str | PathLike | None
     """
-    _set_thread_env(threads)
+    _set_thread_env(threads, use_cpu=use_cpu)
 
     # Build the per-batch processor inside the subprocess so the parent
     # never imports rxnmapper/torch (and, for the fake path, never even
@@ -226,7 +240,12 @@ def run_mapper(
     if use_fake_mapper:
         process_batch = _build_fake_processor()
     else:
-        process_batch = _build_rxnmapper_processor(rxnmapper_batch_size)
+        process_batch = _build_rxnmapper_processor(
+            rxnmapper_batch_size,
+            validate_input=validate_input,
+        )
+
+    dump = MappedRxnDump(mapped_dump_path) if mapped_dump_path is not None else None
 
     try:
         while True:
@@ -235,18 +254,9 @@ def run_mapper(
                 break
             assert isinstance(task, MapTask)
             score_items = process_batch(task.items)
+            if dump is not None:
+                dump.write(score_items)
             score_queue.put(ScoreTask(batch_id=task.batch_id, items=score_items))
     finally:
-        # With several mappers sharing ``score_queue``, only the last one
-        # to finish may emit scorer sentinels — otherwise scorers would see
-        # ``n_mappers * n_scorers`` of them. The shared counter serialises
-        # this decision; a lone mapper (``None``) always emits.
-        if mappers_remaining is None:
-            is_last = True
-        else:
-            with mappers_remaining.get_lock():
-                mappers_remaining.value -= 1
-                is_last = mappers_remaining.value <= 0
-        if is_last:
-            for _ in range(n_scorers):
-                score_queue.put(None)
+        if dump is not None:
+            dump.close()

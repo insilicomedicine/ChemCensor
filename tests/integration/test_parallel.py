@@ -2,11 +2,15 @@ from __future__ import annotations
 
 import csv
 import json
+from collections.abc import Iterator
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from rdkit import Chem
 
+import chemcensor.parallel as parallel_module
+from chemcensor import FailureStage
 from chemcensor.basic import Reaction
 from chemcensor.basic import ReactionCenterType
 from chemcensor.chemcensor import ScoreResult
@@ -60,6 +64,15 @@ def db_path() -> Path:
     return RC_DB_PATH
 
 
+@pytest.fixture(autouse=True)
+def reset_in_process_scorer_cache() -> Iterator[None]:
+    parallel_module._IN_PROCESS_CENSOR = None
+    parallel_module._IN_PROCESS_KEY = None
+    yield
+    parallel_module._IN_PROCESS_CENSOR = None
+    parallel_module._IN_PROCESS_KEY = None
+
+
 @pytest.fixture(scope="module")
 def small_config() -> ParallelConfig:
     """A tiny, deterministic configuration for the integration tests.
@@ -74,7 +87,27 @@ def small_config() -> ParallelConfig:
         mapper_internal_batch_size=2,
         progress=False,
         checkpoint_interval=0,
+        in_process_batch_threshold=0,
     )
+
+
+def test_small_fake_mapper_batch_scores_in_process(db_path: Path) -> None:
+    mapped = _get_fixture(1)["mapped_reaction_smiles"]
+    config = ParallelConfig(
+        use_fake_mapper=True,
+        progress=False,
+        in_process_batch_threshold=2,
+    )
+
+    with patch(
+        "chemcensor.parallel._run_pipeline",
+        side_effect=AssertionError("small batch spawned worker processes"),
+    ):
+        scores = score_batch([mapped, "not-a-reaction"], db_path=db_path, config=config)
+
+    assert scores[0] == ScoreResult.uniform(ScoringConfig.exact_match_scoring.value)
+    assert scores[1].failure_reason is not None
+    assert scores[1].failure_reason.category == "ProcessingSentinel"
 
 
 @pytest.mark.heavy_test
@@ -103,6 +136,12 @@ def test_score_batch_returns_failed_for_garbage(
     )
     failed = ScoreResult.uniform(ScoringConfig.failed_reaction_scoring.value)
     assert scores == [failed] * 2
+    assert all(score.failure_reason is not None for score in scores)
+    assert all(
+        score.failure_reason.stage is FailureStage.PROCESSING
+        for score in scores
+        if score.failure_reason is not None
+    )
 
 
 @pytest.mark.heavy_test
@@ -156,18 +195,36 @@ def test_score_file_writes_results(
     with open(output_csv, encoding="utf-8") as fh:
         rows = list(csv.reader(fh))
 
-    assert rows[0] == ["idx", "smiles", "score_with_fg", "score_without_fg"]
+    assert rows[0] == [
+        "idx",
+        "smiles",
+        "score_with_fg",
+        "score_without_fg",
+        "all_fgs_precedents_are_real",
+        "total_number_of_fgs",
+        "number_of_fgs_covered_by_virtual_precedents",
+        "all_center_precedents_are_real",
+        "failure_stage",
+        "failure_category",
+        "failure_message",
+    ]
     failed = ScoringConfig.failed_reaction_scoring.value
     exact = ScoringConfig.exact_match_scoring.value
 
     # Both score columns carry the same value for exact-match / failed rows.
     seen = {int(r[0]): (float(r[2]), float(r[3])) for r in rows[1:]}
+    failure_fields = {int(r[0]): r[8:11] for r in rows[1:]}
     # All three input rows reach the worker — ">>" is a non-empty SMILES
     # so the reader keeps it; the worker resolves it to ``failed``.
     assert set(seen) == {0, 1, 2}
     assert seen[0] == (exact, exact)
     assert seen[1] == (failed, failed)
     assert seen[2] == (exact, exact)
+    assert failure_fields[0] == ["", "", ""]
+    assert failure_fields[1][0] == FailureStage.PROCESSING
+    assert failure_fields[1][1]
+    assert failure_fields[1][2]
+    assert failure_fields[2] == ["", "", ""]
 
 
 @pytest.mark.heavy_test
@@ -209,9 +266,23 @@ def test_resume_does_not_duplicate_out_of_order_rows(
     already_done = [0, 1, 2, 4, 5]
     with open(output_csv, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
-        w.writerow(["idx", "smiles", "score_with_fg", "score_without_fg"])
+        w.writerow(
+            [
+                "idx",
+                "smiles",
+                "score_with_fg",
+                "score_without_fg",
+                "all_fgs_precedents_are_real",
+                "total_number_of_fgs",
+                "number_of_fgs_covered_by_virtual_precedents",
+                "all_center_precedents_are_real",
+                "failure_stage",
+                "failure_category",
+                "failure_message",
+            ]
+        )
         for i in already_done:
-            w.writerow([i, inputs[i], 0.0, 0.0])
+            w.writerow([i, inputs[i], 0.0, 0.0, True, 0, 0, True, "", "", ""])
 
     ckpt_mod.save(
         ckpt,
@@ -224,12 +295,14 @@ def test_resume_does_not_duplicate_out_of_order_rows(
 
     config = ParallelConfig(
         n_workers=2,
+        n_mappers=2,
         mapper_threads=1,
         batch_size=2,
         mapper_internal_batch_size=2,
         use_fake_mapper=True,
         progress=False,
         checkpoint_interval=0,
+        in_process_batch_threshold=0,
     )
 
     score_file(
@@ -243,7 +316,19 @@ def test_resume_does_not_duplicate_out_of_order_rows(
     with open(output_csv, encoding="utf-8") as fh:
         rows = list(csv.reader(fh))
 
-    assert rows[0] == ["idx", "smiles", "score_with_fg", "score_without_fg"]
+    assert rows[0] == [
+        "idx",
+        "smiles",
+        "score_with_fg",
+        "score_without_fg",
+        "all_fgs_precedents_are_real",
+        "total_number_of_fgs",
+        "number_of_fgs_covered_by_virtual_precedents",
+        "all_center_precedents_are_real",
+        "failure_stage",
+        "failure_category",
+        "failure_message",
+    ]
     written = [int(r[0]) for r in rows[1:]]
     # Every input scored exactly once — no duplicates from re-feeding 4/5.
     assert sorted(written) == list(range(7))
@@ -285,6 +370,7 @@ def test_maxtasksperchild_recycle_scores_all_inputs(db_path: Path) -> None:
         use_fake_mapper=True,
         progress=False,
         checkpoint_interval=0,
+        in_process_batch_threshold=0,
     )
 
     scores = score_batch(inputs, db_path=db_path, config=config, return_dict=True)
@@ -381,6 +467,7 @@ def test_score_batch_distinguishes_fg_variants(tmp_path: Path) -> None:
         find_exact_match=False,
         progress=False,
         checkpoint_interval=0,
+        in_process_batch_threshold=0,
     )
 
     scores = score_batch(
@@ -391,5 +478,7 @@ def test_score_batch_distinguishes_fg_variants(tmp_path: Path) -> None:
         ScoreResult(
             with_functional_groups=ScoringConfig.default_reaction_scoring.value,
             without_functional_groups=ScoringConfig.lc_1_scoring.value,
+            # Non-default counter proves provenance survived the parallel path.
+            total_number_of_fgs=6,
         )
     ]

@@ -31,6 +31,8 @@ class Reaction:
     is_tautomerization_reaction: bool = False
     dummy: bool = False
     document_id: str = ""
+    source: str = ""
+    is_virtual: bool = False
     meta: frozendict[str, Any] = field(default_factory=frozendict)
 
     def get_reaction_center_by_type(

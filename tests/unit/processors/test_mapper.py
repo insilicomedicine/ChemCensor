@@ -1,4 +1,7 @@
+import os
 import re
+import sys
+from types import ModuleType
 from unittest.mock import patch
 
 import pytest
@@ -138,3 +141,53 @@ def test_process_batch(mapper, batch):
     assert results[2].dummy
     assert results[2] is SENTINEL
     assert results[3].dummy
+
+
+def test_process_batch_retries_individually_after_batch_failure(mapper):
+    good = Reaction(reaction_smiles="CCO>>CC=O")
+    bad = Reaction(reaction_smiles="CCN>>CC=N")
+
+    def map_reactions(smiles):
+        if len(smiles) > 1:
+            raise RuntimeError("batch failed")
+        if smiles[0] == bad.reaction_smiles:
+            raise RuntimeError("single reaction failed")
+        return iter(["[CH3:1][CH2:2][OH:3]>>[CH3:1][CH:2]=[O:3]"])
+
+    with patch.object(mapper._mapper, "map_reactions", side_effect=map_reactions):
+        results = mapper.process_batch([good, bad])
+
+    assert results[0].mapped_reaction_smiles
+    assert results[1] is SENTINEL
+
+
+def test_use_cpu_hides_cuda_before_batched_mapper(monkeypatch):
+    seen: dict[str, str | None] = {}
+
+    class _FakeBatchedMapper:
+        def __init__(self, **_kwargs):
+            seen["cuda"] = os.environ.get("CUDA_VISIBLE_DEVICES")
+
+    fake_rxnmapper = ModuleType("rxnmapper")
+    fake_rxnmapper.BatchedMapper = _FakeBatchedMapper
+    monkeypatch.setitem(sys.modules, "rxnmapper", fake_rxnmapper)
+    monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "0")
+    mapper = Mapper(use_cpu=True)
+    assert mapper.use_cpu is True
+    assert seen["cuda"] == ""
+    assert os.environ["CUDA_VISIBLE_DEVICES"] == "0"
+
+
+def test_mapper_preserves_existing_omp_num_threads(monkeypatch):
+    class _FakeBatchedMapper:
+        def __init__(self, **_kwargs):
+            pass
+
+    fake_rxnmapper = ModuleType("rxnmapper")
+    fake_rxnmapper.BatchedMapper = _FakeBatchedMapper
+    monkeypatch.setitem(sys.modules, "rxnmapper", fake_rxnmapper)
+    monkeypatch.setenv("OMP_NUM_THREADS", "8")
+
+    Mapper(n_jobs=2)
+
+    assert os.environ["OMP_NUM_THREADS"] == "8"

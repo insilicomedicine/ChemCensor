@@ -11,6 +11,7 @@ from chemcensor.basic import Reaction
 from chemcensor.composition.composer import ReactionCenterDBComposer
 from chemcensor.configs import CompositionConfig
 from chemcensor.db import DBManager
+from chemcensor.db.errors import InvalidDBVersionError
 from chemcensor.rules.functional_groups import FG_COLLECTION_SEAR
 from chemcensor.rules.functional_groups import FG_SIGNATURE_LENGTH
 
@@ -33,6 +34,9 @@ def _make_reaction(
     dummy: bool = False,
     is_sis_reaction: bool = False,
     reaction_centers: dict | None = None,
+    *,
+    is_virtual: bool = False,
+    source: str = "",
 ):
     rxn = MagicMock()
     rxn.reaction_smiles = smiles
@@ -41,6 +45,8 @@ def _make_reaction(
     rxn.reaction_centers = reaction_centers or {}
     rxn.canonical_smiles = smiles
     rxn.document_id = "test"
+    rxn.source = source
+    rxn.is_virtual = is_virtual
     rxn.sear_signature = np.zeros(FG_COLLECTION_SEAR.num_groups, dtype=np.uint8)
 
     return rxn
@@ -159,6 +165,118 @@ class TestAddCenters:
 
         assert composer._manager.find_center("rc_a") is not None
         assert composer._manager.find_center("rc_b") is not None
+
+    def test_virtual_composer_does_not_or_with_real(
+        self, mock_processor, mock_extractor
+    ):
+        real_sig = np.array([1, 0, 0], dtype=np.uint8)
+        virt_sig = np.array([0, 1, 0], dtype=np.uint8)
+
+        composer = ReactionCenterDBComposer(
+            mock_processor, mock_extractor, batch_size=5
+        )
+        composer._add_centers(
+            [
+                _make_reaction(
+                    reaction_centers={"RC1": _make_rc("rc_x", real_sig)},
+                    is_virtual=False,
+                )
+            ]
+        )
+        composer._add_centers(
+            [
+                _make_reaction(
+                    reaction_centers={"RC1": _make_rc("rc_x", virt_sig)},
+                    is_virtual=True,
+                )
+            ]
+        )
+
+        assert np.array_equal(
+            composer._manager.find_center("rc_x", is_virtual=False), real_sig
+        )
+        assert np.array_equal(
+            composer._manager.find_center("rc_x", is_virtual=True), virt_sig
+        )
+
+
+class TestComposeCsvVirtual:
+    def test_compose_reads_per_row_is_virtual_and_source(
+        self, mock_processor, mock_extractor, tmp_path
+    ):
+        csv_path = tmp_path / "mixed.csv"
+        out_path = tmp_path / "out.sqlite"
+        with csv_path.open("w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                [
+                    "library_id",
+                    "cleaned_rxn",
+                    "document_id",
+                    "is_virtual",
+                    "source_id",
+                ]
+            )
+            writer.writerow(["lib1", "A>>B", "pat1", "0", ""])
+            writer.writerow(["lib1", "C>>D", "pat2", "1", "21"])
+
+        def _process_with_doc(batch):
+            processed = []
+            for r in batch:
+                rxn = _make_reaction(
+                    r.reaction_smiles,
+                    is_virtual=r.is_virtual,
+                    source=r.source,
+                )
+                rxn.document_id = r.document_id
+                processed.append(rxn)
+            return processed
+
+        mock_processor.process_batch.side_effect = _process_with_doc
+
+        def _extract(batch):
+            out = []
+            for r in batch:
+                rxn = _make_reaction(
+                    r.canonical_smiles,
+                    reaction_centers={
+                        "RC1": _make_rc(
+                            f"rc_{r.canonical_smiles}",
+                            np.array(
+                                [1, 0] if not r.is_virtual else [0, 1],
+                                dtype=np.uint8,
+                            ),
+                        )
+                    },
+                    is_virtual=r.is_virtual,
+                    source=r.source,
+                )
+                rxn.document_id = r.document_id
+                out.append(rxn)
+            return out
+
+        mock_extractor.extract_rc_for_batch.side_effect = _extract
+
+        composer = ReactionCenterDBComposer(
+            mock_processor,
+            mock_extractor,
+            batch_size=5,
+        )
+        composer.compose(csv_path, out_path, db_version="U9-TEST")
+
+        loaded = DBManager.load(out_path)
+        assert loaded.find_center("rc_A>>B", is_virtual=False) is not None
+        assert loaded.find_center("rc_C>>D", is_virtual=True) is not None
+        real_row = loaded._conn.execute(
+            "SELECT is_virtual, source FROM reactions WHERE reaction_smiles = ?",
+            ("A>>B",),
+        ).fetchone()
+        virt_row = loaded._conn.execute(
+            "SELECT is_virtual, source FROM reactions WHERE reaction_smiles = ?",
+            ("C>>D",),
+        ).fetchone()
+        assert real_row == (0, "")
+        assert virt_row == (1, "21")
 
 
 # ---------------------------------------------------------------------------
@@ -319,33 +437,13 @@ class TestComposeSmokeTest:
 
     def test_compose_with_real_pipeline(self):
         from chemcensor.basic import ReactionCenterType
+        from chemcensor.configs import CompositionPipelineConfig
         from chemcensor.extraction import ReactionCenterExtractor
-        from chemcensor.processing import ReactionProcessor
-        from chemcensor.processing import Validator
-        from chemcensor.processing import Mapper
-        from chemcensor.processing import OrphanRemover
-        from chemcensor.processing import TransformCreator
-        from chemcensor.processing import CanoRxnAnnotator
-        from chemcensor.processing import SisAnnotator
-        from chemcensor.processing import SeArAnnotator
-        from chemcensor.processing import BatchFilter
-        from chemcensor.rules.functional_groups import FG_COLLECTION_SEAR
 
         if not self.REFERENCE_CSV.exists():
             pytest.skip(f"Test CSV not found: {self.REFERENCE_CSV}")
 
-        processor = ReactionProcessor(
-            (
-                Validator(),
-                Mapper(batch_size=20),
-                OrphanRemover(),
-                TransformCreator(),
-                CanoRxnAnnotator(),
-                SisAnnotator(),
-                SeArAnnotator(FG_COLLECTION_SEAR),
-                BatchFilter(),
-            )
-        )
+        processor = CompositionPipelineConfig(mapper_batch_size=20).build_processor()
         extractor = ReactionCenterExtractor(max_center_type=ReactionCenterType.RC4)
 
         composer = ReactionCenterDBComposer(
@@ -353,11 +451,12 @@ class TestComposeSmokeTest:
             reaction_center_extractor=extractor,
             batch_size=20,
             reaction_smiles_column="reaction_smiles",
+            document_id_column="document_id",
         )
 
         with tempfile.TemporaryDirectory() as tmpdir:
             db_path = Path(tmpdir) / "test_output.sqlite"
-            composer.compose(self.REFERENCE_CSV, db_path)
+            composer.compose(self.REFERENCE_CSV, db_path, db_version="U9-TEST")
 
             assert db_path.exists()
 
@@ -366,7 +465,7 @@ class TestComposeSmokeTest:
             row = loaded._conn.execute(
                 "SELECT COUNT(*) FROM reaction_centers"
             ).fetchone()
-            assert row[0] == 103, "Database should contain 103 reaction centers"
+            assert row[0] == 102, "Database should contain 102 reaction centers"
             assert (
                 loaded.find_reaction(
                     "CC1=NN(c2ccccc2)C(=O)C1C(=O)CC=O.CNN"
@@ -479,3 +578,40 @@ class TestRunPostprocessing:
         assert out[1] == 0
         assert out[2] == 0
         assert out[4] == 1  # original composite-row bit preserved (OR with AND)
+
+
+def _write_stamp_csv(path: Path) -> None:
+    """Write a CSV using the composer's default column names."""
+    with path.open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(["cleaned_rxn", "document_id"])
+        writer.writerow(["A>>B", "doc1"])
+
+
+class TestComposeStampsDatabase:
+    def test_compose_writes_build_stamp(
+        self, composer, mock_processor, mock_extractor, tmp_path: Path
+    ):
+        csv_path = tmp_path / "in.csv"
+        out_path = tmp_path / "out.sqlite"
+        _write_stamp_csv(csv_path)
+        mock_processor.process_batch.return_value = []
+        mock_extractor.extract_rc_for_batch.side_effect = lambda batch: []
+
+        composer.compose(csv_path, out_path, db_version="U9-TEST")
+
+        metadata = DBManager.read_metadata(out_path)
+        assert metadata["db_version"] == "U9-TEST"
+        assert metadata["built_at"]
+        assert metadata["chemcensor_version"]
+
+    def test_compose_requires_a_version_label(
+        self, composer, mock_processor, mock_extractor, tmp_path: Path
+    ):
+        csv_path = tmp_path / "in.csv"
+        _write_stamp_csv(csv_path)
+        mock_processor.process_batch.return_value = []
+        mock_extractor.extract_rc_for_batch.side_effect = lambda batch: []
+
+        with pytest.raises(InvalidDBVersionError, match="db_version"):
+            composer.compose(csv_path, tmp_path / "out.sqlite", db_version="")

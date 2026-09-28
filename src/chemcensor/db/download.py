@@ -29,11 +29,12 @@ def download_default_database(
     """
     from huggingface_hub import hf_hub_download
 
+    normalized_cache_dir = Path(cache_dir) if cache_dir is not None else None
     path = hf_hub_download(
         repo_id=DEFAULT_DATABASE_REPO_ID,
         filename=DEFAULT_DATABASE_FILENAME,
         repo_type="dataset",
-        cache_dir=cache_dir,
+        cache_dir=normalized_cache_dir,
         force_download=force_download,
         token=token,
         local_files_only=local_files_only,
